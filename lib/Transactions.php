@@ -142,6 +142,54 @@ class Transactions {
 			return $result[0]['total'];
 	}
 	
+	public static function candlesticks($candle_size=false,$currency=false,$c=false) {
+		global $CFG;
+		
+		$candle_size = (!$candle_size) ? '5min' : '';
+		$avail_sizes = array(
+			'1min'=>60,
+			'3min'=>180,
+			'5min'=>300,
+			'15min'=>900,
+			'30min'=>1800,
+			'1h'=>3600,
+			'2h'=>7200,
+			'4h'=>14400,
+			'6h'=>21600,
+			'12h'=>43200,
+			'1d'=>'DATE(`date1))',
+			'3d'=>'DATE(`date1))',
+			'1w'=>'YEARWEEK(`date1))'
+		);
+
+		if (!array_key_exists($candle_size,$avail_sizes))
+			return false;
+		
+		$c = (!$c) ? 100 : $c;
+		$group = (is_numeric($avail_sizes[$candle_size])) ? 'UNIX_TIMESTAMP(`date`) DIV '.$avail_sizes[$candle_size] : $avail_sizes[$candle_size];
+		$open = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",-1)';
+		$close = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",1)';
+		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
+		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : $CFG->currencies['USD'];
+		$usd_field = 'usd_ask';
+		
+		$price_str = '(CASE WHEN transactions.currency = '.$currency_info['id'].' THEN transactions.btc_price WHEN transactions.currency1 = '.$currency_info['id'].' THEN transactions.orig_btc_price ELSE transactions.orig_btc_price * (CASE transactions.currency1 ';
+		foreach ($CFG->currencies as $curr_id => $currency1) {
+			if (is_numeric($curr_id) || $currency1['currency'] == 'BTC')
+				continue;
+		
+			if (!empty($currency_info) && $currency1['id'] == $currency_info['id'])
+				continue;
+		
+			$conversion = (empty($currency_info) || $currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
+			$price_str .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
+		}
+		$price_str .= ' END) END)';
+		
+		$sql = 'SELECT MIN('.$price_str.') AS low, MAX('.$price_str.') AS high, '.$open.' AS open, '.$close.' AS close FROM transactions GROUP BY '.$group.' ORDER BY id DESC LIMIT 0,'.$c;
+		return db_query_array($sql);
+	}
+	
 	public static function getTypes() {
 		global $CFG;
 		
