@@ -142,10 +142,10 @@ class Transactions {
 			return $result[0]['total'];
 	}
 	
-	public static function candlesticks($candle_size=false,$currency=false,$c=false) {
+	public static function candlesticks($candle_size=false,$currency=false,$c=false,$first=false,$last=false) {
 		global $CFG;
 		
-		$candle_size = (!$candle_size) ? '5min' : '';
+		$candle_size = (!$candle_size) ? '5min' : $candle_size;
 		$avail_sizes = array(
 			'1min'=>60,
 			'3min'=>180,
@@ -157,18 +157,16 @@ class Transactions {
 			'4h'=>14400,
 			'6h'=>21600,
 			'12h'=>43200,
-			'1d'=>'DATE(`date1))',
-			'3d'=>'DATE(`date1))',
-			'1w'=>'YEARWEEK(`date1))'
+			'1d'=>86400,
+			'3d'=>259200,
+			'1w'=>604800
 		);
-
+	
 		if (!array_key_exists($candle_size,$avail_sizes))
 			return false;
 		
 		$c = (!$c) ? 100 : $c;
 		$group = (is_numeric($avail_sizes[$candle_size])) ? 'UNIX_TIMESTAMP(`date`) DIV '.$avail_sizes[$candle_size] : $avail_sizes[$candle_size];
-		$open = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",-1)';
-		$close = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",1)';
 		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
 		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : $CFG->currencies['USD'];
 		$usd_field = 'usd_ask';
@@ -186,7 +184,20 @@ class Transactions {
 		}
 		$price_str .= ' END) END)';
 		
-		$sql = 'SELECT MIN('.$price_str.') AS low, MAX('.$price_str.') AS high, '.$open.' AS open, '.$close.' AS close FROM transactions GROUP BY '.$group.' ORDER BY id DESC LIMIT 0,'.$c;
+		$open = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id ASC),",",1)';
+		$close = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",1)';
+		$timestamp = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(`date` AS CHAR) ORDER BY id DESC),",",1)';
+		$first_id = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(id AS CHAR) ORDER BY id ASC),",",1)';
+		$last_id = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(id AS CHAR) ORDER BY id DESC),",",1)';
+		
+		$where = ' WHERE 1 ';
+		if ($first)
+			$where .= ' AND id < '.$first;
+		if ($last)
+			$where .= ' AND id > '.$last;
+		
+		$sql = 'SELECT '.$timestamp.' AS t, '.$open.' AS open, '.$close.' AS close, MIN('.$price_str.') AS low, MAX('.$price_str.') AS high, SUM(btc) AS volume, '.$first_id.' AS first_id, '.$last_id.' AS last_id FROM transactions '.$where.' GROUP BY '.$group.' ORDER BY id DESC LIMIT 0,'.$c;
+
 		return db_query_array($sql);
 	}
 	
