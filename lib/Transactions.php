@@ -197,7 +197,6 @@ class Transactions {
 			$where .= ' AND id > '.$last;
 		
 		$sql = 'SELECT '.$timestamp.' AS t, '.$open.' AS open, '.$close.' AS close, MIN('.$price_str.') AS low, MAX('.$price_str.') AS high, SUM(btc) AS volume, '.$first_id.' AS first_id, '.$last_id.' AS last_id FROM transactions '.$where.' GROUP BY '.$group.' ORDER BY id DESC LIMIT 0,'.$c;
-
 		return db_query_array($sql);
 	}
 	
