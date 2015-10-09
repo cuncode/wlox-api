@@ -144,29 +144,103 @@ class Transactions {
 	
 	public static function candlesticks($candle_size=false,$currency=false,$c=false,$first=false,$last=false) {
 		global $CFG;
-		
-		$candle_size = (!$candle_size) ? '5min' : $candle_size;
+
 		$avail_sizes = array(
-			'1min'=>60,
-			'3min'=>180,
-			'5min'=>300,
-			'15min'=>900,
-			'30min'=>1800,
-			'1h'=>3600,
-			'2h'=>7200,
-			'4h'=>14400,
-			'6h'=>21600,
-			'12h'=>43200,
-			'1d'=>86400,
-			'3d'=>259200,
-			'1w'=>604800
+			'1min'=>array(60,60,'MINUTE'),
+			'3min'=>array(180,60,'MINUTE'),
+			'5min'=>array(300,60,'MINUTE'),
+			'15min'=>array(900,60,'MINUTE'),
+			'30min'=>array(1800,60,'MINUTE'),
+			'1h'=>array(3600,3600,'HOUR'),
+			'2h'=>array(7200,3600,'HOUR'),
+			'4h'=>array(14400,3600,'HOUR'),
+			'6h'=>array(21600,3600,'HOUR'),
+			'12h'=>array(43200,3600,'HOUR'),
+			'1d'=>array(86400,86400,'DAY'),
+			'3d'=>array(259200,86400,'DAY'),
+			'1w'=>array(604800,604800,'WEEK')
 		);
 	
 		if (!array_key_exists($candle_size,$avail_sizes))
 			return false;
 		
-		$c = (!$c) ? 100 : $c;
-		$group = (is_numeric($avail_sizes[$candle_size])) ? 'UNIX_TIMESTAMP(`date`) DIV '.$avail_sizes[$candle_size] : $avail_sizes[$candle_size];
+		$c = preg_replace("/[^0-9]/", "",$c);
+		$c = (!$c) ? 300 : $c;
+		$first = preg_replace("/[^0-9]/", "",$first);
+		$last = preg_replace("/[^0-9]/", "",$last);
+		
+		
+		$limit = false;
+		if (!$last) {
+			if ($first) {
+				$end = '(SELECT `date` FROM transactions WHERE id = '.$first.')';
+			}
+			else
+				$end = 'NOW()';
+				
+			$start = 'INTERVAL '.(($avail_sizes[$candle_size][0] / $avail_sizes[$candle_size][1]) * $c).' '.$avail_sizes[$candle_size][2];
+			$sql = 'SELECT id FROM transactions WHERE `date` < ('.$end.' - '.$start.') ORDER BY id DESC LIMIT 0,1';
+			$result = db_query_array($sql);
+			if ($result) {
+				$last = $result[0]['id'];
+			}
+				
+			if (!$result) {
+				$limit = ' LIMIT 0,'.$c;
+				$last = false;
+			}
+		}
+		
+		if ($CFG->memcached) {
+			$first_block = false;
+			$last_block = false;
+			$finalized = false;
+			$cached = array();
+			
+			if ($first > 0) {
+				$block_id = floor(($first - 1) / $c);
+				for ($i = $block_id; $i >= 0; $i--) {
+					$block = $CFG->m->get('candles_'.$currency.'_'.$i);
+					if (!$block)
+						continue;
+					
+					$cached = array_merge($block['items'],$cached);
+					$first = $block['items'][0]['id'];
+					$first_block = $block;
+					
+					if ($last > 0 && $first <= $last) {
+						$last = $first - ($c - count($first_block));
+						break;
+					}
+				}
+			}
+			else if ($last > 0) {
+				$block_id = floor(($last + 1) / $c);
+				while ($block = $CFG->m->get('candles_'.$currency.'_'.$block_id)) {
+					$cached = array_merge($cached,$block['items']);
+					$last = $block['items'][count($block['items']) - 1]['id'];
+					$last_block = $block;
+					$block_id++;
+				}
+			}
+			else {
+				$block_id = $CFG->m->get('candles_'.$currency.'_last');
+				if ($block_id) {
+					while ($block = $CFG->m->get('candles_'.$currency.'_'.$block_id)) {
+						$cached = array_merge($cached,$block['items']);
+						$last = $block['items'][count($block['items']) - 1]['id'];
+						$last_block = $block;
+						$block_id++;
+					}
+				}
+			}
+		
+			if (!$first && (count($cached) > 0 && (time() - strtotime($cached[count($cached) - 1]['t']) < $avail_sizes[$candle_size][1]) || $last_block['e_final']))
+				return $cached;
+			else if ($first_block && (count($first_block['items']) >= 300 || $first_block['s_final']))
+				return $cached;
+		}
+		
 		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
 		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : $CFG->currencies['USD'];
 		$usd_field = 'usd_ask';
@@ -183,21 +257,85 @@ class Transactions {
 			$price_str .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
 		}
 		$price_str .= ' END) END)';
-		
-		$open = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id ASC),",",1)';
-		$close = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST('.$price_str.' AS CHAR) ORDER BY id DESC),",",1)';
-		$timestamp = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(`date` AS CHAR) ORDER BY id DESC),",",1)';
-		$first_id = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(id AS CHAR) ORDER BY id ASC),",",1)';
-		$last_id = 'SUBSTRING_INDEX(GROUP_CONCAT(CAST(id AS CHAR) ORDER BY id DESC),",",1)';
-		
+
 		$where = ' WHERE 1 ';
-		if ($first)
-			$where .= ' AND id < '.$first;
-		if ($last)
-			$where .= ' AND id > '.$last;
+		if ($first) {
+			$where .= ' AND id < '.$first.' ';
+		}
 		
-		$sql = 'SELECT '.$timestamp.' AS t, '.$open.' AS open, '.$close.' AS close, MIN('.$price_str.') AS low, MAX('.$price_str.') AS high, SUM(btc) AS volume, '.$first_id.' AS first_id, '.$last_id.' AS last_id FROM transactions '.$where.' GROUP BY '.$group.' ORDER BY id DESC LIMIT 0,'.$c;
-		return db_query_array($sql);
+		if ($last) {
+			$where .= ' AND id > '.$last;
+		}
+
+		$sql = 'SELECT `date` AS t, '.$price_str.' AS price, id, btc AS vol FROM transactions '.$where.' ORDER BY id DESC '.$limit;
+		$result =  db_query_array($sql);
+
+		if ($result) {
+			$result = array_reverse($result);
+			
+			if ($CFG->memcached) {
+				$cached_blocks = array();
+				$block_before = 0;
+				$block_first_id = 0;
+				
+				foreach ($result as $row) {
+					$block_id = intval($row['id'] / $c);
+					if (!array_key_exists($block_id,$cached_blocks)) {
+						$block = $CFG->m->get('candles_'.$currency.'_'.$block_id);
+						$block_before = 0;
+						
+						if ($block) {
+							$cached_blocks[$block_id] = $block;
+							$block_first_id = $cached_blocks[$block_id]['items'][0]['id'];
+						}
+						else {
+							$cached_blocks[$block_id] = array('items'=>array(),'s_final'=>array(),'e_final'=>array());
+							$block_first_id = 0;
+						}
+					}
+					
+					if (count($cached_blocks[$block_id]['items']) > 0 && $row['id'] < $block_first_id) {
+						$cached_blocks[$block_id]['items'] = array_splice($cached_blocks[$block_id]['items'],$block_before,0,array($row));
+						$block_before++;
+					}
+					else if (count($cached_blocks[$block_id]['items']) == 0 || $row['id'] > $cached_blocks[$block_id]['items'][count($cached_blocks[$block_id]['items']) - 1]['id']) {
+						$cached_blocks[$block_id]['items'][] = $row;
+					}	
+				}
+				
+				if ($cached) {
+					if (!$first)
+						$result = array_merge($cached,$result);
+					else 
+						$result = array_merge($result,$cached);
+				}
+				
+				
+				
+				$first_id = $result[0]['id'];
+				$last_id = $result[count($result) - 1]['id'];
+				$first_block_id = floor($first_id / $c);
+				$last_block_id = floor($first_id / $c);
+				
+				$last_block = false;
+				foreach ($cached_blocks as $block_id => $items) {
+					$items['s_final'] = (!empty($items['s_final']) || count($items['items']) >= 300 || ($first_id <= $items['items'][0]['id'] && $block_id > $first_block_id));
+					$items['e_final'] = (!empty($items['e_final']) || count($items['items']) >= 300 || ($last_id >= $items['items'][count($items['items']) - 1]['id'] && $block_id < $last_block_id));
+					$CFG->m->set('candles_'.$currency.'_'.$block_id,$items,0);
+					$last_block = $block_id;
+				}
+				
+				if (!$first)
+					$CFG->m->set('candles_'.$currency.'_last',$last_block,0);
+			}
+		}
+		else {
+			$first_id = ($last) ? $last : 0;
+			$last_id = ($first && $last) ? $first_id : $last + 1;
+			$result = array(array('first_id'=>$first_id,'last_id'=>$first_id));
+		}
+		
+		return $result;
 	}
 	
 	public static function getTypes() {
