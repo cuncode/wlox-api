@@ -264,14 +264,13 @@ class Transactions {
 		}
 		
 		if ($last) {
-			$where .= ' AND id > '.$last;
+			$where .= ' AND id >= '.$last;
 		}
 
 		$sql = 'SELECT `date` AS t, '.$price_str.' AS price, id, btc AS vol FROM transactions '.$where.' ORDER BY id DESC '.$limit;
-		$result =  db_query_array($sql);
-
-		if ($result) {
-			$result = array_reverse($result);
+		$result = db_query_array($sql);
+		if ($result || $cached) {
+			$result = ($result) ? array_reverse($result) : array();
 			
 			if ($CFG->memcached) {
 				$cached_blocks = array();
