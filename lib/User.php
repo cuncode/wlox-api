@@ -67,7 +67,7 @@ class User {
 			}
 		}
 		
-		if ($CFG->memcached)
+		if ($CFG->memcached && !$currencies)
 			$CFG->m->set('balances_'.$user_id,$sorted,60);
 		
 		return $sorted;
@@ -113,8 +113,10 @@ class User {
 			}
 		}
 		
-		if ($result)
-			self::deleteBalanceCache($user_id);
+		if ($result) {
+			$CFG->unset_cache['orders'][$user_id] = 1;
+			$CFG->unset_cache['balances'][$user_id] = 1;
+		}
 		
 		return $result;
 	}
@@ -155,7 +157,7 @@ class User {
 		}
 
 		if (User::$info['ip'] != $CFG->client_ip) {
-			return array('message'=>'session-not-found','attempts'=>$login_attempts);
+			return array('error'=>'session-not-found','attempts'=>$login_attempts);
 		}
 		
 		if (User::$info['awaiting'] == 'Y') {
@@ -248,44 +250,78 @@ class User {
 			$currencies = array($currencies);
 		
 		$currencies_str = '';
-		if (is_array($currencies))
+		$currencies_str1 = '';
+		$amounts = array();
+		$amounts1 = array();
+		if (is_array($currencies)) {
 			$currencies_str .= 'AND currency IN ('.implode(',',$currencies).')';
-		
-		$sql = "
-		SELECT currency, ROUND(SUM(IF(currency != {$CFG->btc_currency_id},amount,0)),2) AS fiat, SUM(IF(currency = {$CFG->btc_currency_id},amount,0)) AS btc, 'r' AS type FROM requests WHERE site_user = $user_id AND request_type = {$CFG->request_widthdrawal_id} AND request_status IN ({$CFG->request_pending_id},{$CFG->request_awaiting_id}) $currencies_str GROUP BY currency
-		UNION
-		SELECT currency, ROUND(SUM(IF(order_type = {$CFG->order_type_bid},fiat + (fiat * $fee),0)),2) AS fiat, SUM(IF(order_type = {$CFG->order_type_ask},btc,0)) AS btc, 'o' AS type FROM orders WHERE site_user = $user_id $currencies_str GROUP BY currency $lock";
-		$result = db_query_array($sql);
-		
-		if ($result) {
-			$btc_total_req = 0;
-			$btc_total_ord = 0;
+			$currencies1 = $currencies;
+			if (in_array($CFG->btc_currency_id,$currencies1)) {
+				unset($currencies1[$CFG->btc_currency_id]);
+				$currencies_str1 .= 'AND (order_type = '.$CFG->order_type_ask.' OR currency IN ('.implode(',',$currencies).'))';
+			}
+			else
+				$currencies_str1 .= 'AND currency IN ('.implode(',',$currencies1).')';
 			
-			foreach ($result as $row) {
-				$fiat_total = 0;
-				$curr_abbr = $CFG->currencies[$row['currency']]['currency'];
-								
-				if ($row['type'] == 'r') {
-					$on_hold['BTC']['withdrawal'] = floatval($row['btc']) + (!empty($on_hold['BTC']['withdrawal']) ? $on_hold['BTC']['withdrawal'] : 0);
-					$on_hold[$curr_abbr]['withdrawal'] = $row['fiat'];
-				}
-				else {
-					$on_hold['BTC']['order'] = floatval($row['btc']) + (!empty($on_hold['BTC']['order']) ? $on_hold['BTC']['order'] : 0);
-					$on_hold[$curr_abbr]['order'] = $row['fiat'];
-				}
+			foreach ($currencies as $currency_id) {
+				$amounts[] = 'SUM(IF(currency = '.$currency_id.',amount,0)) AS '.$CFG->currencies[$currency_id]['currency'];
 				
-				$on_hold['BTC']['total'] = floatval($row['btc']) + (!empty($on_hold['BTC']['total']) ? $on_hold['BTC']['total'] : 0);
-				$on_hold[$curr_abbr]['total'] = floatval($row['fiat']) + (!empty($on_hold[$curr_abbr]['total']) ? $on_hold[$curr_abbr]['total'] : 0);
+				if ($currency_id != $CFG->btc_currency_id)
+					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_bid.' AND currency = '.$currency_id.',fiat + (fiat * '.$fee.'),0)) AS '.$CFG->currencies[$currency_id]['currency'];
+				else
+					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_ask.',btc,0)) AS '.$CFG->currencies[$currency_id]['currency'];
+			}
+		}
+		else {
+			foreach ($CFG->currencies as $currency_id => $currency1) {
+				if (!is_numeric($currency_id))
+					continue;
+			
+				$amounts[] = 'SUM(IF(currency = '.$currency_id.',amount,0)) AS '.$currency1['currency'];
+				
+				if ($currency_id != $CFG->btc_currency_id)
+					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_bid.' AND currency = '.$currency_id.',fiat + (fiat * '.$fee.'),0)) AS '.$currency1['currency'];
+				else
+					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_ask.',btc,0)) AS '.$currency1['currency'];
 			}
 		}
 		
-		if (array_key_exists('BTC',$on_hold) && count($on_hold) > 1) {
-			$btc_row = array_shift($on_hold);
+		$sql = "
+		SELECT ".implode(',',$amounts).", 'r' AS type FROM requests WHERE site_user = $user_id AND request_type = {$CFG->request_widthdrawal_id} AND request_status IN ({$CFG->request_pending_id},{$CFG->request_awaiting_id}) $currencies_str
+		UNION
+		SELECT ".implode(',',$amounts1).", 'o' AS type FROM orders WHERE site_user = $user_id $currencies_str1 $lock";
+		$result = db_query_array($sql);
+		if ($result) {
+			foreach ($result as $row) {
+				foreach ($row as $field => $value) {
+					if ($field == 'type')
+						continue;
+					if (!($value > 0) && !($currencies && in_array($CFG->currencies[$field]['id'],$currencies)))
+						continue;
+					
+					if ($field != 'BTC')
+						$value = round($value,2,PHP_ROUND_HALF_UP);
+					
+					if ($row['type'] == 'r') {
+						$on_hold[$field]['withdrawal'] = $value;
+					}
+					else {
+						$on_hold[$field]['order'] = $value;
+					}
+					
+					$on_hold[$field]['total'] = floatval($value) + (!empty($on_hold[$field]['total']) ? $on_hold[$field]['total'] : 0);
+				}
+			}
+		}
+		
+		if (!$currencies && array_key_exists('BTC',$on_hold) && count($on_hold) > 1) {
+			$btc_row = $on_hold['BTC'];
+			unset($on_hold['BTC']);
 			ksort($on_hold);
 			$on_hold = array_merge(array('BTC'=>$btc_row),$on_hold);
 		}
 		
-		if ($CFG->memcached) {
+		if ($CFG->memcached && !$currencies) {
 			$on_hold1 = ($on_hold) ? $on_hold : array();
 			$CFG->m->set('on_hold_'.$user_id,$on_hold,60);
 		}
@@ -383,7 +419,7 @@ class User {
 	}
 	
 	public static function randomPassword($length = 8) {
-		$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%&*?";
+		$chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 		$password = substr(str_shuffle($chars),0,$length);
 		return $password;
 	}
@@ -490,11 +526,11 @@ class User {
 		db_query($sql);
 		
 		self::deleteCache();
-		
-		$request_id = db_insert('change_settings',array('date'=>date('Y-m-d H:i:s'),'site_user'=>$id,'request'=>1));
+		$email_token = self::randomPassword(12);
+		$request_id = db_insert('change_settings',array('email_token'=>$email_token,'date'=>date('Y-m-d H:i:s'),'site_user'=>$id,'request'=>1,'type'=>'r'));
 		if ($request_id > 0) {
 			$vars = User::$info;
-			$vars['authcode'] = urlencode(Encryption::encrypt($request_id));
+			$vars['authcode'] = urlencode(Encryption::encrypt($email_token));
 			$vars['baseurl'] = $CFG->frontend_baseurl;
 		
 			$email1 = SiteEmail::getRecord('forgot');
@@ -675,7 +711,7 @@ class User {
 		if (!$update['pass'])
 			unset($update['pass']);
 
-		if (($update['pass'] && mb_strlen($update['pass'],'utf-8') < $CFG->pass_min_chars) /*|| !$update['first_name'] || !$update['last_name'] */|| !$update['email'])
+		if ((!empty($update['pass']) && mb_strlen($update['pass'],'utf-8') < $CFG->pass_min_chars) /*|| !$update['first_name'] || !$update['last_name'] */|| !$update['email'])
 			return false;
 		
 		self::deleteCache();
@@ -683,9 +719,12 @@ class User {
 		if ($CFG->session_id) {
 		    $sql = "DELETE FROM sessions WHERE user_id = ".User::$info['id']." AND session_id != {$CFG->session_id}";
 		    db_query($sql);
+		    
+		    $sql = "DELETE FROM change_settings WHERE site_user = ".User::$info['id'];
+		    db_query($sql);
 		}
 
-		if ($update['pass'])
+		if (!empty($update['pass']))
 			$update['pass'] = Encryption::hash($update['pass']);
 		
 		return db_update('site_users',User::$info['id'],$update);
@@ -774,10 +813,11 @@ class User {
 		$sql = "DELETE FROM change_settings WHERE site_user = ".User::$info['id'];
 		db_query($sql);
 		
-		$request_id = db_insert('change_settings',array('date'=>date('Y-m-d H:i:s'),'request'=>base64_encode(serialize($request)),'site_user'=>User::$info['id']));
+		$email_token = self::randomPassword(12);
+		$request_id = db_insert('change_settings',array('email_token'=>$email_token,'date'=>date('Y-m-d H:i:s'),'request'=>base64_encode(serialize($request)),'site_user'=>User::$info['id'],'type'=>'s'));
 		if ($request_id > 0) {
 			$vars = User::$info;
-			$vars['authcode'] = urlencode(Encryption::encrypt($request_id));
+			$vars['authcode'] = urlencode(Encryption::encrypt($email_token));
 			$vars['baseurl'] = $CFG->frontend_baseurl;
 		
 			if (!$security_page)
@@ -796,12 +836,20 @@ class User {
 			return false;
 		
 		$request_id = Encryption::decrypt(urldecode($settings_change_id1));
-		if (!($request_id > 0))
+		if (!$request_id)
 			return false;
 		
-		$change_request = DB::getRecord('change_settings',$request_id,0,1);
-		return $change_request['request'];
-
+		$request_id = preg_replace("/[^0-9a-zA-Z]/", "",$request_id);
+		if (!$request_id)
+			return false;
+		
+		$sql = 'SELECT request FROM change_settings WHERE email_token = "'.$request_id.'"';
+		$result = db_query_array($sql);
+		
+		if (!$result)
+			return false;
+		
+		return $result[0]['request'];
 	}
 	
 	public static function notifyLogin() {

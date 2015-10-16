@@ -114,23 +114,21 @@ class Transactions {
 			if (!$result)
 				$result = array();
 			
+			$set = array();
 			if (($per_page == 5 || $per_page == 1) && !$count && !$public_api_all) {
-				$CFG->m->set('trans_l5_'.$currency_info['currency'],$result,300);
-				$result1 = array_slice($result,0,1);
-				$CFG->m->set('trans_l1_'.$currency_info['currency'],$result1,300);
-			}
-			elseif ($public_api_all)
-				$CFG->m->set('trans_api'.(($per_page) ? '_l'.$per_page : '').(($user) ? '_u'.$user : '').(($currency) ? '_c'.$currency_info['currency'] : '').(($type) ? '_t'.$type : ''),$result,300);
-			
-			if ($public_api_all) {
-				$cached = $CFG->m->get('trans_cache');
-				if (!$cached)
-					$cached = array();
+				$key = 'trans_l5_'.$currency_info['currency'];
+				$set[$key] = $result;
 				
-				$key = (($per_page) ? '_l'.$per_page : '').(($user) ? '_u'.$user : '').(($currency) ? '_c'.$currency_info['currency'] : '').(($type) ? '_t'.$type : '');
-				$cached[$key] = true;
-				$CFG->m->set('trans_cache',$cached,300);
+				$result1 = array_slice($result,0,1);
+				$key = 'trans_l1_'.$currency_info['currency'];
+				$set[$key] = $result1;
 			}
+			elseif ($public_api_all) {
+				$key = 'trans_api'.(($per_page) ? '_l'.$per_page : '').(($user) ? '_u'.$user : '').(($currency) ? '_c'.$currency_info['currency'] : '').(($type) ? '_t'.$type : '');
+				$set[$key] = $result;
+			}
+			
+			memcached_safe_set($set,300);
 		}
 		
 		if ($result && count($result) == 0)

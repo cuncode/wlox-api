@@ -1,6 +1,6 @@
 <?php
 class Stats {
-	public static function getHistorical($timeframe='1year',$currency='usd',$public_api=false) {
+	public static function getHistorical($timeframe='1mon',$currency='usd',$public_api=false) {
 		global $CFG;
 		
 		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
@@ -106,8 +106,11 @@ class Stats {
 		$stats['market_cap'] = $result[0]['market_cap'];
 		$stats['trade_volume'] = $result[0]['trade_volume'];
 		
-		if ($CFG->memcached)
-			$CFG->m->set('stats_'.$currency_info['currency'],$stats,120);
+		if ($CFG->memcached) {
+			$key = 'stats_'.$currency_info['currency'];
+			$set[$key] = $stats;
+			memcached_safe_set($set,300);
+		}
 		
 		return $stats;
 	}

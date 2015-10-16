@@ -25,6 +25,7 @@ $CFG->session_active = false;
 $CFG->session_api = false;
 $CFG->token_verified = false;
 $CFG->email_2fa_verified = false;
+$CFG->unset_cache = false;
 
 // commands is of form array('Class1'=>array('method1'=>array('arg1'=>blah,'arg2'=>bob)));
 $commands = (!empty($_POST['commands'])) ? json_decode($_POST['commands'],true) : false;
@@ -183,11 +184,17 @@ if ($token1 > 0) {
 // email 2fa for settings changes
 if ($settings_change_id1 && ($CFG->session_active || $CFG->session_locked)) {
 	$request_id = Encryption::decrypt(hex2bin($settings_change_id1));
-	if ($request_id > 0) {
-		$change_request = DB::getRecord('change_settings',$request_id,0,1);
-		if ($change_request) {
-			db_delete('change_settings',$request_id);
-			$CFG->email_2fa_verified = true;
+	if ($request_id) { 
+		$request_id = preg_replace("/[^0-9a-zA-Z]/", "",$request_id);
+		if ($request_id) {
+			$sql = 'SELECT id,request FROM change_settings WHERE email_token = "'.$request_id.'"';
+			$result = db_query_array($sql);
+			if ($result) {
+				db_delete('change_settings',$result[0]['id']);
+				$CFG->email_2fa_verified = true;
+			}
+			else
+				$return['error'] = 'request-expired';
 		}
 		else
 			$return['error'] = 'request-expired';
@@ -196,14 +203,15 @@ if ($settings_change_id1 && ($CFG->session_active || $CFG->session_locked)) {
 		$return['error'] = 'request-expired';
 }
 
-/* Lang Key Selector */
+// select language
 $CFG->lang_table_key = $CFG->language;
 if ($CFG->language == 'en')
 	$CFG->lang_table_key = 'eng';
 elseif ($CFG->language == 'es')
 	$CFG->lang_table_key = 'esp';
 
-if (is_array($commands) && empty($return['error'])) {
+
+if (is_array($commands)) {
 	foreach ($commands as $classname => $methods_arr) {
 		if (in_array($classname,$system_classes))
 			continue;
@@ -234,6 +242,7 @@ if (is_array($commands) && empty($return['error'])) {
 	}
 }
 
+// update session nonce
 if ($update_nonce) {
 	if ($CFG->memcached && empty($CFG->delete_cache) && !$awaiting_token) {
 		$result[0]['nonce'] = $nonce1 + 1;
@@ -242,6 +251,10 @@ if ($update_nonce) {
 	else
 		$return['nonce_updated'] = db_update('sessions',$session_id1,array('nonce'=>($nonce1 + 1),'session_time'=>date('Y-m-d H:i:s')),'session_id');
 }
+
+// delete cache if necessary
+if ($CFG->memcached && $CFG->unset_cache)
+	Orders::unsetCache($CFG->unset_cache);
 
 if (is_array($return))
 	echo json_encode($return);

@@ -395,4 +395,22 @@ function db_is_syntax_error() {
 	
 	return in_array($e,$errors);
 }
+
+function memcached_safe_set($set,$time_seconds,$attempts=1) {
+	global $CFG;
+	
+	if (!$set)
+		return false;
+
+	$locked = $CFG->m->add('lock',true,2);
+	if ($locked)
+		return false;
+	
+	$cache_log = $CFG->m->get('cache_log');
+	$cache_log = (!$cache_log) ? array() : $cache_log;
+	$cache_log = array_merge($cache_log,array_keys($set));
+	$set['cache_log'] = $cache_log;
+	$CFG->m->setMulti($set,$time_seconds);
+	$CFG->m->delete('lock');
+}
 ?>
