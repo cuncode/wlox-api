@@ -932,6 +932,47 @@ class User {
 		$return['global_btc_volume'] = ($global_btc_vol[0]['total_btc_traded'] > 0) ? $global_btc_vol[0]['total_btc_traded'] : 0;
 		return $return;
 	}
+	
+	public static function getDistribution() {
+		global $CFG;
+		
+		if ($CFG->memcached) {
+			$cached = $CFG->m->get('distribution');
+			if ($cached) {
+				return $cached;
+			}
+		}
+	
+		$sql = 'SELECT SUM(balance) AS total FROM site_users_balances WHERE currency = '.$CFG->btc_currency_id;
+		$result = db_query_array($sql);
+		if (!$result)
+			return false;
+		
+		$total = $result[0]['total'];
+		$sql = 'SELECT COUNT(site_user) AS users, ROUND(FLOOR((balance / '.$total.') * 10) * 10) AS divided FROM `site_users_balances` GROUP BY divided ORDER BY divided DESC';
+		$result = db_query_array($sql);
+		if (!$result)
+			return false;
+		
+		$return = array();
+		foreach (range(0,90,10) as $percentile) {
+			$amount_users = 0;
+			foreach ($result as $row) {
+				if ($row['divided'] == $percentile) {
+					$amount_users = $row['users'];
+					break;
+				}
+			}
+			
+			$min = ($percentile / 100) * $total;
+			$return[] = array($min,$amount_users);
+		}
+		
+		if ($CFG->memcached)
+			$CFG->m->set('distribution',$return,300);
+		
+		return $return;
+	}
 
 	public static function deleteCache($session_id=false) {
 		global $CFG;
