@@ -76,11 +76,11 @@ class Stats {
 		}
 		$price_str .= ' END)) END)';
 		
-		$sql = 'SELECT r2.btc_price AS btc_price2, r3.btc_price AS btc_price3, r2.last_transaction_type AS last_transaction_type2, r2.last_transaction_currency AS last_transaction_currency2, r3.last_transaction_currency AS last_transaction_currency3, r4.total_btc_traded, r5.max, r5.min, current_stats.total_btc, current_stats.market_cap, current_stats.trade_volume FROM current_stats ';
+		$sql = 'SELECT r2.btc_price AS btc_price2, r3.btc_price AS btc_price3, r2.last_transaction_type AS last_transaction_type2, r2.last_transaction_currency AS last_transaction_currency2, r3.last_transaction_currency AS last_transaction_currency3, r4.btc_24h, r4.btc_24h_s, r4.btc_24h_b, r4.btc_1h, r4.btc_1h_s, r4.btc_1h_b, r5.max, r5.min, current_stats.total_btc, current_stats.market_cap, current_stats.trade_volume FROM current_stats ';
 
 		$sql_arr[] = "LEFT JOIN (SELECT IF(transactions.currency = $currency_id,transactions.btc_price,transactions.orig_btc_price) AS btc_price, IF(transactions.transaction_type = {$CFG->transactions_buy_id},'BUY','SELL') AS last_transaction_type, IF(transactions.currency != $currency_id AND transactions.currency1 != $currency_id,transactions.currency1,$currency_id) AS last_transaction_currency FROM transactions WHERE 1 ".((!$CFG->cross_currency_trades) ? "AND transactions.currency = $currency_id" : '')." ORDER BY transactions.id DESC LIMIT 0,1) AS r2 ON (1)";
 		$sql_arr[] = "LEFT JOIN (SELECT IF(transactions.currency = $currency_id,transactions.btc_price,transactions.orig_btc_price) AS btc_price, IF(transactions.currency != $currency_id AND transactions.currency1 != $currency_id,transactions.currency1,$currency_id) AS last_transaction_currency FROM transactions WHERE transactions.date < DATE_SUB(DATE_ADD(NOW(), INTERVAL ".((($CFG->timezone_offset)/60)/60)." HOUR), INTERVAL 1 DAY) ".((!$CFG->cross_currency_trades) ? "AND transactions.currency = $currency_id" : '')." ORDER BY transactions.id DESC LIMIT 0,1) AS r3  ON (1)";
-		$sql_arr[] = "LEFT JOIN (SELECT btc_24h AS total_btc_traded FROM status) AS r4 ON (1)";
+		$sql_arr[] = "LEFT JOIN (SELECT btc_24h, btc_24h_s, btc_24h_b, btc_1h, btc_1h_s, btc_1h_b FROM status) AS r4 ON (1)";
 		$sql_arr[] = "LEFT JOIN (SELECT MAX(".(($CFG->cross_currency_trades) ? "ROUND($price_str,2)" : 'transactions.btc_price').") AS `max`, MIN(".(($CFG->cross_currency_trades) ? "ROUND($price_str,2)" : 'transactions.btc_price').") AS `min` FROM transactions WHERE transactions.date >= CURDATE() ".((!$CFG->cross_currency_trades) ? "AND transactions.currency = $currency_id" : '')." LIMIT 0,1) AS r5 ON (1)";
 		
 		$sql .= implode(' ',$sql_arr).' WHERE current_stats.id = 1';
@@ -97,14 +97,20 @@ class Stats {
 		$stats['last_transaction_type'] = $result[0]['last_transaction_type2'];
 		$stats['last_transaction_currency'] = $result[0]['last_transaction_currency2'];
 		$stats['daily_change'] = ($result[0]['btc_price3'] > 0 && $result[0]['btc_price2'] > 0) ? $result[0]['btc_price2'] - $result[0]['btc_price3'] : '0';
-		$stats['daily_change_percent'] = ($stats['last_price'] > 0) ? ($stats['daily_change']/$stats['last_price']) * 100 : 0;
+		$stats['daily_change_percent'] = ($stats['last_price'] > 0) ? round(($stats['daily_change']/$stats['last_price']) * 100,2) : 0;
 		$stats['max'] = ($result[0]['max'] > 0) ? $result[0]['max'] : $result[0]['btc_price2'];
 		$stats['min'] = ($result[0]['min'] > 0) ? $result[0]['min'] : $result[0]['btc_price2'];
 		$stats['open'] = ($result[0]['btc_price3'] > 0) ? $result[0]['btc_price3'] : $result[0]['btc_price2'];
-		$stats['total_btc_traded'] = $result[0]['total_btc_traded'];
+		$stats['total_btc_traded'] = $result[0]['btc_24h'];
 		$stats['total_btc'] = $result[0]['total_btc'];
 		$stats['market_cap'] = $result[0]['market_cap'];
 		$stats['trade_volume'] = $result[0]['trade_volume'];
+		$stats['btc_24h'] = $result[0]['btc_24h'];
+		$stats['btc_24h_buy'] = $result[0]['btc_24h_b'];
+		$stats['btc_24h_sell'] = $result[0]['btc_24h_s'];
+		$stats['btc_1h'] = $result[0]['btc_1h'];
+		$stats['btc_1h_buy'] = $result[0]['btc_1h_b'];
+		$stats['btc_1h_sell'] = $result[0]['btc_1h_s'];
 		
 		if ($CFG->memcached) {
 			$key = 'stats_'.$currency_info['currency'];
