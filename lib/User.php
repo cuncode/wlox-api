@@ -187,7 +187,9 @@ class User {
 		'notify_login',
 		'deactivated',
 		'locked',
-		'default_currency');
+		'default_currency',
+		'chat_handle'
+		);
 		
 		$return = array();
 		foreach (User::$info as $key => $value) {
@@ -208,6 +210,10 @@ class User {
 		if (User::$info['default_currency'] > 0) {
 			$currency = $CFG->currencies[User::$info['default_currency']];
 			$return['default_currency_abbr'] = $currency['currency'];
+		}
+		
+		if (empty($return['chat_handle'])) {
+			$return['chat_handle'] = 'Guest-'.$return['user'];
 		}
 		
 		return array('message'=>'logged-in','info'=>$return);
@@ -707,6 +713,7 @@ class User {
 		//$update['country'] = preg_replace("/[^0-9]/", "",$info['country']);
 		$update['email'] = preg_replace("/[^0-9a-zA-Z@\.\!#\$%\&\*+_\~\?\-]/", "",$info['email']);
 		$update['default_currency'] = preg_replace("/[^0-9]/", "",$info['default_currency']);
+		$update['chat_handle'] = preg_replace("/[^\pL a-zA-Z0-9@\s\._-]/u", "",$info['chat_handle']);
 		
 		if (!$update['pass'])
 			unset($update['pass']);
