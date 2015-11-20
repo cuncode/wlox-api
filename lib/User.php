@@ -188,7 +188,8 @@ class User {
 		'deactivated',
 		'locked',
 		'default_currency',
-		'chat_handle'
+		'chat_handle',
+		'shares_enabled'
 		);
 		
 		$return = array();
