@@ -62,7 +62,8 @@ class Shares {
 		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : false;
 		
 		$shares_info = self::get();
-		$total = round($shares_info['unit_cost_usd'] / $currency_info['usd_ask'],2,PHP_ROUND_HALF_UP) * $shares;
+		$unit_cost = ($buy) ? $shares_info['unit_cost_usd'] : $shares_info['unit_cost_usd_sell'];
+		$total = round($shares_info['unit_cost_usd'] / $currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) * $shares;
 		$total_usd = $shares_info['unit_cost_usd'] * $shares;
 		$held = self::sharesHeld();
 		$multiplier = ($buy ? -1 : 1);
@@ -85,6 +86,11 @@ class Shares {
 		db_update('site_users',User::$info['id'],array('shares_owned'=>(User::$info['shares_owned'] + ($shares * $multiplier1)),'shares_payed'=>(User::$info['shares_payed'] + ($total_usd * $multiplier1))));
 		User::updateBalances(User::$info['id'],array($currency=>($this_balance + ($multiplier * $total))));	
 		db_commit();
+		
+		self::updateHeld($shares * $multiplier1);
+		User::deleteCache();
+		User::deleteBalanceCache(User::$info['id']);
+		db_insert('history',array('date'=>date('Y-m-d H:i:s'),'ip'=>$CFG->client_ip,'history_action'=>(($buy) ? $CFG->history_buy_shares_id : $CFG->history_sell_shares_id),'site_user'=>User::$info['id'],'balance_before'=>$this_balance,'balance_after'=>($this_balance + ($multiplier * $total))));
 		
 		return true;
 	}
@@ -112,7 +118,7 @@ class Shares {
 		
 		if ($day_of_month != date('j'))
 			return array('error'=>array('message'=>str_replace('[day]',$day_of_month,Lang::string('shares-wrong-day-error')),'code'=>'SHARES_WRONG_DAY'));
-		if (($shares + $held) > $num_for_sale)
+		if ($buy && (($shares + $held) > $num_for_sale))
 			return array('error'=>array('message'=>str_replace('[shares]',($num_for_sale - $held),Lang::string('shares-too-many-error')),'code'=>'SHARES_NOT_ENOUGH_AVAILABLE'));
 		if (!($shares > 0))
 			return array('error'=>array('message'=>Lang::string('shares-zero-error'),'code'=>'SHARES_ZERO'));
@@ -124,8 +130,18 @@ class Shares {
 			return array('error'=>array('message'=>Lang::string('buy-errors-no-currency'),'code'=>'SHARES_INVALID_CURRENCY'));
 		if ($buy && ($total > $available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low')),'code'=>'SHARES_BALANCE_TOO_LOW');
+		if (!$buy && ($shares > User::$info['shares_owned']))
+			return array('error'=>array('message'=>str_replace('[shares]',User::$info['shares_owned'],Lang::string('shares-too-many-user-error'))),'code'=>'SHARES_NOT_ENOUGH_USER');
 		
 		return false;
+	}
+	
+	public static function updateHeld($amount) {
+		if (!$amount > 0)
+			return false;
+		
+		$sql = 'UPDATE shares SET shares_held = (shares_held + ('.$amount.')) WHERE id = 1';
+		return db_query($sql);
 	}
 }
 ?>
