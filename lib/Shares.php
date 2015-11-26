@@ -118,7 +118,7 @@ class Shares {
 		if ($day_of_month != date('j'))
 			return array('error'=>array('message'=>str_replace('[day]',$day_of_month,Lang::string('shares-wrong-day-error')),'code'=>'SHARES_WRONG_DAY'));
 		if ($buy && (($shares + $held) > $num_for_sale))
-			return array('error'=>array('message'=>str_replace('[shares]',max($num_for_sale,0),Lang::string('shares-too-many-error')),'code'=>'SHARES_NOT_ENOUGH_AVAILABLE'));
+			return array('error'=>array('message'=>str_replace('[shares]',max(($num_for_sale - $held),0),Lang::string('shares-too-many-error')),'code'=>'SHARES_NOT_ENOUGH_AVAILABLE'));
 		if (!($shares > 0))
 			return array('error'=>array('message'=>Lang::string('shares-zero-error'),'code'=>'SHARES_ZERO'));
 		if (!$currency_info)
