@@ -1,12 +1,12 @@
 <?php 
 class Shares {
-	public static function get() {
+	public static function get($lock=false) {
 		global $CFG;
 	
 		if (!$CFG->session_active)
 			return false;
 		
-		$sql = 'SELECT * FROM shares WHERE id = 1';
+		$sql = 'SELECT * FROM shares WHERE id = 1 '.($lock ? ' LOCK IN SHARE MODE' : '');
 		$result = db_query_array($sql);
 		$return = $result[0];
 		$return['shares_enabled'] = User::$info['shares_enabled'];
@@ -61,15 +61,14 @@ class Shares {
 		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
 		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : false;
 		
-		$shares_info = self::get();
+		db_start_transaction();
+		$shares_info = self::get(true);
 		$unit_cost = ($buy) ? $shares_info['unit_cost_usd'] : $shares_info['unit_cost_usd_sell'];
 		$total = round($unit_cost / $currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) * $shares;
 		$total_usd = $unit_cost * $shares;
 		$held = self::sharesHeld();
 		$multiplier = ($buy ? -1 : 1);
 		$multiplier1 = ($buy ? 1 : -1);
-
-		db_start_transaction();
 		
 		$user_balances = User::getBalances(User::$info['id'],array($currency_info['id']),true);
 		$user_fee = FeeSchedule::getUserFees(User::$info['id']);
@@ -119,7 +118,7 @@ class Shares {
 		if ($day_of_month != date('j'))
 			return array('error'=>array('message'=>str_replace('[day]',$day_of_month,Lang::string('shares-wrong-day-error')),'code'=>'SHARES_WRONG_DAY'));
 		if ($buy && (($shares + $held) > $num_for_sale))
-			return array('error'=>array('message'=>str_replace('[shares]',max(($num_for_sale - $held),0),Lang::string('shares-too-many-error')),'code'=>'SHARES_NOT_ENOUGH_AVAILABLE'));
+			return array('error'=>array('message'=>str_replace('[shares]',max($num_for_sale,0),Lang::string('shares-too-many-error')),'code'=>'SHARES_NOT_ENOUGH_AVAILABLE'));
 		if (!($shares > 0))
 			return array('error'=>array('message'=>Lang::string('shares-zero-error'),'code'=>'SHARES_ZERO'));
 		if (!$currency_info)
