@@ -63,8 +63,8 @@ class Shares {
 		
 		$shares_info = self::get();
 		$unit_cost = ($buy) ? $shares_info['unit_cost_usd'] : $shares_info['unit_cost_usd_sell'];
-		$total = round($shares_info['unit_cost_usd'] / $currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) * $shares;
-		$total_usd = $shares_info['unit_cost_usd'] * $shares;
+		$total = round($unit_cost / $currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) * $shares;
+		$total_usd = $unit_cost * $shares;
 		$held = self::sharesHeld();
 		$multiplier = ($buy ? -1 : 1);
 		$multiplier1 = ($buy ? 1 : -1);
