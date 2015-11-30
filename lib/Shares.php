@@ -194,7 +194,7 @@ class Shares {
 			return db_insert('shares_imbalances',array('imbalance'=>$amount,'currency'=>$currency_id));
 		
 		$sql = 'UPDATE shares_imbalances SET imbalance = imbalance + ('.$amount.') WHERE currency = '.$currency_id;
-		return db_query_array($sql);
+		return db_query($sql);
 	}
 }
 ?>
