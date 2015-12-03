@@ -16,8 +16,7 @@ class Chat{
 		global $CFG;
 	
 		if (!$CFG->session_active) {
-			return array('not-logged-in'=>1);
-			return false;
+			return array('chat-not-logged-in'=>1);
 		}
 	
 		if (!$message)
