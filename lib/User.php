@@ -207,10 +207,11 @@ class User {
 			$return['tel'] = str_repeat('x',$s).substr($return['tel'], -2);
 		}
 		
-		if (User::$info['default_currency'] > 0) {
-			$currency = $CFG->currencies[User::$info['default_currency']];
-			$return['default_currency_abbr'] = $currency['currency'];
-		}
+		if (User::$info['default_currency'] > 0)
+			$return['default_currency'] = User::$info['default_currency'];
+		
+		if (User::$info['default_c_currency'] > 0)
+			$return['default_c_currency'] = User::$info['default_c_currency'];
 		
 		if (empty($return['chat_handle'])) {
 			$return['chat_handle'] = 'Guest-'.$return['user'];
@@ -247,6 +248,8 @@ class User {
 			}
 		}
 
+		$cryptos = Currencies::getCryptos();
+		$main = Currencies::getMain();
 		$user_fee = (is_array($user_fee)) ? $user_fee : FeeSchedule::getUserFees($user_id);
 		$fee = $user_fee['fee1'] * 0.01;
 		$lock = ($for_update) ? 'LOCK IN SHARE MODE' : '';
@@ -254,42 +257,30 @@ class User {
 		
 		if (!is_array($currencies) && $currencies > 0)
 			$currencies = array($currencies);
+		else if (empty($currencies)) {
+			foreach ($CFG->currencies as $curr_id => $currency) {
+				if (is_numeric($curr_id))
+					$currencies[] = $curr_id;
+			}
+		}
 		
 		$currencies_str = '';
 		$currencies_str1 = '';
 		$amounts = array();
 		$amounts1 = array();
+		
 		if (is_array($currencies)) {
-			$currencies_str .= 'AND currency IN ('.implode(',',$currencies).')';
-			$currencies1 = $currencies;
-			if (in_array($CFG->btc_currency_id,$currencies1)) {
-				unset($currencies1[$CFG->btc_currency_id]);
-				$currencies_str1 .= 'AND (order_type = '.$CFG->order_type_ask.' OR currency IN ('.implode(',',$currencies).'))';
-			}
-			else
-				$currencies_str1 .= 'AND currency IN ('.implode(',',$currencies1).')';
-			
 			foreach ($currencies as $currency_id) {
 				$amounts[] = 'SUM(IF(currency = '.$currency_id.',amount,0)) AS '.$CFG->currencies[$currency_id]['currency'];
 				
-				if ($currency_id != $CFG->btc_currency_id)
+				if (!in_array($currency_id,$cryptos))
 					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_bid.' AND currency = '.$currency_id.',fiat + (fiat * '.$fee.'),0)) AS '.$CFG->currencies[$currency_id]['currency'];
 				else
-					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_ask.',btc,0)) AS '.$CFG->currencies[$currency_id]['currency'];
+					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_ask.' AND c_currency = '.$currency_id.',btc,IF(order_type = '.$CFG->order_type_bid.' AND currency = '.$currency_id.',fiat + (fiat * '.$fee.'),0))) AS '.$CFG->currencies[$currency_id]['currency'];
 			}
-		}
-		else {
-			foreach ($CFG->currencies as $currency_id => $currency1) {
-				if (!is_numeric($currency_id))
-					continue;
 			
-				$amounts[] = 'SUM(IF(currency = '.$currency_id.',amount,0)) AS '.$currency1['currency'];
-				
-				if ($currency_id != $CFG->btc_currency_id)
-					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_bid.' AND currency = '.$currency_id.',fiat + (fiat * '.$fee.'),0)) AS '.$currency1['currency'];
-				else
-					$amounts1[] = 'SUM(IF(order_type = '.$CFG->order_type_ask.',btc,0)) AS '.$currency1['currency'];
-			}
+			$currencies_str .= 'AND currency IN ('.implode(',',$currencies).')';
+			$currencies_str1 .= 'AND currency IN ('.implode(',',$currencies).')';
 		}
 		
 		$sql = "
@@ -309,10 +300,10 @@ class User {
 						$value = round($value,2,PHP_ROUND_HALF_UP);
 					
 					if ($row['type'] == 'r') {
-						$on_hold[$field]['withdrawal'] = $value;
+						$on_hold[$field]['withdrawal'] = round($value,($CFG->currencies[$field]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 					}
 					else {
-						$on_hold[$field]['order'] = $value;
+						$on_hold[$field]['order'] = round($value,($CFG->currencies[$field]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 					}
 					
 					$on_hold[$field]['total'] = floatval($value) + (!empty($on_hold[$field]['total']) ? $on_hold[$field]['total'] : 0);
@@ -320,12 +311,7 @@ class User {
 			}
 		}
 		
-		if (!$currencies && array_key_exists('BTC',$on_hold) && count($on_hold) > 1) {
-			$btc_row = $on_hold['BTC'];
-			unset($on_hold['BTC']);
-			ksort($on_hold);
-			$on_hold = array_merge(array('BTC'=>$btc_row),$on_hold);
-		}
+		ksort($on_hold);
 		
 		if ($CFG->memcached && !$currencies) {
 			$on_hold1 = ($on_hold) ? $on_hold : array();
@@ -344,21 +330,12 @@ class User {
 	
 		self::$on_hold = (is_array(self::$on_hold)) ? self::$on_hold : self::getOnHold();
 		if ($CFG->currencies) {
-			$on_hold = (!empty(self::$on_hold['BTC']['total'])) ? self::$on_hold['BTC']['total'] : 0;
-			$available['BTC'] = User::$info['btc'] - $on_hold;
-			$available['BTC'] = ($available['BTC'] < 0.00000001) ? 0 : $available['BTC'];
 			foreach ($CFG->currencies as $currency) {
-				if ($currency['currency'] == 'BTC')
-					continue;
-				
-				if (empty(User::$info[strtolower($currency['currency'])]))
-					continue;
-					
 				$on_hold = (!empty(self::$on_hold[$currency['currency']]['total'])) ? self::$on_hold[$currency['currency']]['total'] : 0;
-				if (User::$info[strtolower($currency['currency'])] - $on_hold <= 0)
+				if (empty(User::$info[strtolower($currency['currency'])]) || User::$info[strtolower($currency['currency'])] - $on_hold <= 0)
 					continue;
 	
-				$available[$currency['currency']] = round(User::$info[strtolower($currency['currency'])] - $on_hold,2,PHP_ROUND_HALF_UP);
+				$available[$currency['currency']] = round(User::$info[strtolower($currency['currency'])] - $on_hold,($currency['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 			}
 		}
 		return $available;
@@ -940,23 +917,27 @@ class User {
 		return $return;
 	}
 	
-	public static function getDistribution() {
+	public static function getDistribution($c_currency) {
 		global $CFG;
 		
+		$c_currency_info = (!empty($CFG->currencies[$c_currency])) ? $CFG->currencies[$c_currency] : false;
+		if (!$c_currency_info)
+			return false;
+		
 		if ($CFG->memcached) {
-			$cached = $CFG->m->get('distribution');
+			$cached = $CFG->m->get('distribution_'.$c_currency);
 			if ($cached) {
 				return $cached;
 			}
 		}
 	
-		$sql = 'SELECT SUM(balance) AS total FROM site_users_balances WHERE currency = '.$CFG->btc_currency_id;
+		$sql = 'SELECT SUM(balance) AS total FROM site_users_balances WHERE currency = '.$c_currency;
 		$result = db_query_array($sql);
 		if (!$result)
 			return false;
 		
 		$total = $result[0]['total'];
-		$sql = 'SELECT COUNT(site_user) AS users, ROUND(FLOOR((balance / '.$total.') * 10) * 10) AS divided FROM `site_users_balances` GROUP BY divided ORDER BY divided DESC';
+		$sql = 'SELECT COUNT(site_user) AS users, ROUND(FLOOR((balance / '.$total.') * 10) * 10) AS divided FROM `site_users_balances` WHERE currency = '.$c_currency.' GROUP BY divided ORDER BY divided DESC';
 		$result = db_query_array($sql);
 		if (!$result)
 			return false;
@@ -976,7 +957,7 @@ class User {
 		}
 		
 		if ($CFG->memcached)
-			$CFG->m->set('distribution',$return,300);
+			$CFG->m->set('distribution_'.$c_currency,$return,300);
 		
 		return $return;
 	}
