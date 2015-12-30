@@ -329,6 +329,7 @@ class User {
 		if (!$CFG->session_active)
 			return false;
 	
+		$available = array();
 		self::$on_hold = (is_array(self::$on_hold)) ? self::$on_hold : self::getOnHold();
 		if ($CFG->currencies) {
 			foreach ($CFG->currencies as $currency) {
@@ -903,10 +904,6 @@ class User {
 		if ($volume)
 			$volume = self::getVolume();
 		
-		$global_btc_vol = ($CFG->memcached) ? $CFG->m->get('btc_traded') : false;
-		if (!$global_btc_vol)
-			$global_btc_vol = Stats::getBTCTraded();
-		
 		$fees = FeeSchedule::getRecord(false,1);
 		
 		$return['on_hold'] = ($on_hold) ? $on_hold : array();
@@ -914,7 +911,6 @@ class User {
 		$return['usd_volume'] = ($volume) ? $volume : 0;
 		$return['fee_bracket']['maker'] = ($fees['fee1']) ? $fees['fee1'] : 0;
 		$return['fee_bracket']['taker'] = ($fees['fee']) ? $fees['fee'] : 0;
-		$return['global_btc_volume'] = ($global_btc_vol[0]['total_btc_traded'] > 0) ? $global_btc_vol[0]['total_btc_traded'] : 0;
 		return $return;
 	}
 	
