@@ -8,6 +8,7 @@ class Orders {
 			return false;
 		
 		$not_convertible = Currencies::getNotConvertible();
+		$cryptos = Currencies::getCryptos();
 		$usd_info = $CFG->currencies['USD'];
 		$currency_info = (!empty($CFG->currencies[$currency])) ? $CFG->currencies[$currency] : false;
 		$c_currency_info = (!empty($CFG->currencies[$c_currency])) ? $CFG->currencies[$c_currency] : false;
@@ -78,11 +79,11 @@ class Orders {
 			$price_str = 'orders.btc_price';
 		
 		if (!$count && !$public_api_open_orders && !$public_api_order_book)
-			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,')." ".(($open_orders) ? 'ROUND('.$price_str_usd.',2) AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
+			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,'.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto,' : ''))." ".(($open_orders) ? 'ROUND('.$price_str_usd.','.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),8,2)' : '2').') AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
 		elseif (!$count && $public_api_order_book)
 			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, orders.btc AS order_amount, ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp`, $currency_abbr1 AS market ";
 		elseif (!$count && $public_api_open_orders)
-			$sql = "SELECT order_log.id AS id, IF(order_log.order_type = {$CFG->order_type_bid},'buy','sell') AS side, (IF(order_log.market_price = 'Y','market',IF(order_log.stop_price > 0,'stop','limit'))) AS `type`, order_log.btc AS amount, IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining) AS amount_remaining, order_log.btc_price AS price, ROUND(SUM(IF(transactions.id IS NOT NULL OR transactions1.id IS NOT NULL,(transactions.btc  / (order_log.btc - IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining))) * IF(transactions.id IS NOT NULL,transactions.btc_price,transactions1.orig_btc_price),0)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS avg_price_executed, order_log.stop_price AS stop_price, $currency_abbr AS currency, $currency_abbr1 AS market, order_log.status AS status, order_log.p_id AS replaced, IF(order_log.status = 'REPLACED',replacing_order.id,0) AS replaced_by, UNIX_TIMESTAMP(orders.date) AS `timestamp`";
+			$sql = "SELECT order_log.id AS id, IF(order_log.order_type = {$CFG->order_type_bid},'buy','sell') AS side, (IF(order_log.market_price = 'Y','market',IF(order_log.stop_price > 0,'stop','limit'))) AS `type`, order_log.btc AS amount, IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining) AS amount_remaining, order_log.btc_price AS price, ROUND(SUM(IF(transactions.id IS NOT NULL OR transactions1.id IS NOT NULL,(transactions.btc  / (order_log.btc - IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining))) * IF(transactions.id IS NOT NULL,transactions.btc_price,transactions1.orig_btc_price),0)),".(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),8,2)' : '2').") AS avg_price_executed, order_log.stop_price AS stop_price, $currency_abbr AS currency, $currency_abbr1 AS market, order_log.status AS status, order_log.p_id AS replaced, IF(order_log.status = 'REPLACED',replacing_order.id,0) AS replaced_by, UNIX_TIMESTAMP(orders.date) AS `timestamp`";
 		else
 			$sql = "SELECT COUNT(orders.id) AS total ";
 			
@@ -279,7 +280,7 @@ class Orders {
 			$price_str_ask = 'orders.btc_price';
 		}
 		
-		$sql = "SELECT ROUND(MAX(IF(orders.order_type = {$CFG->order_type_bid},$price_str_bid,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS bid, ROUND(MIN(IF(orders.order_type = {$CFG->order_type_ask},$price_str_ask,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS ask FROM orders WHERE orders.c_currency = ".$c_currency_info['id']." AND orders.currency != ".$currency_info['id']." ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : 'AND (orders.currency = '.$currency_info['id'].' '.((count($not_convertible) > 0) ? 'OR orders.currency NOT IN ('.implode(',',$not_convertible).')' : '').')')." AND orders.btc_price > 0 LIMIT 0,1";
+		$sql = "SELECT ROUND(MAX(IF(orders.order_type = {$CFG->order_type_bid},$price_str_bid,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS bid, ROUND(MIN(IF(orders.order_type = {$CFG->order_type_ask},$price_str_ask,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS ask FROM orders WHERE orders.c_currency = ".$c_currency_info['id']." AND orders.currency != ".$c_currency_info['id']." ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : 'AND (orders.currency = '.$currency_info['id'].' '.((count($not_convertible) > 0) ? 'OR orders.currency NOT IN ('.implode(',',$not_convertible).')' : '').')')." AND orders.btc_price > 0 LIMIT 0,1";
 		$result = db_query_array($sql);
 		$res = ($result[0]) ? $result[0] : array('bid'=>0,'ask'=>0);
 		
@@ -364,21 +365,21 @@ class Orders {
 				LEFT JOIN (SELECT btc_price, order_type, currency FROM orders WHERE order_type = {$CFG->order_type_bid} ORDER BY btc_price DESC LIMIT 0,1) AS max_bid ON (orders.currency = max_bid.currency)
 				LEFT JOIN (SELECT btc_price, order_type, currency FROM orders WHERE order_type = {$CFG->order_type_ask} ORDER BY btc_price DESC LIMIT 0,1) AS max_ask ON (orders.currency = max_ask.currency)
 				SET orders.market_price = 'Y', orders.btc_price = IF(orders.btc_price > 0,orders.btc_price,orders.stop_price)
-				WHERE orders.c_currency = $c_currency AND orders.currency != ".$currency_info['id']." $not_in AND ((orders.stop_price >= IF($price_str < max_bid.btc_price,max_bid.btc_price,$price_str) AND orders.order_type = {$CFG->order_type_ask}) OR (orders.stop_price <= IF($price_str1 > max_ask.btc_price,max_ask.btc_price,$price_str1) AND orders.order_type = {$CFG->order_type_bid}))
+				WHERE orders.c_currency = $c_currency AND orders.currency != ".$c_currency." $not_in AND ((orders.stop_price >= IF($price_str < max_bid.btc_price,max_bid.btc_price,$price_str) AND orders.order_type = {$CFG->order_type_ask}) OR (orders.stop_price <= IF($price_str1 > max_ask.btc_price,max_ask.btc_price,$price_str1) AND orders.order_type = {$CFG->order_type_bid}))
 				AND orders.stop_price > 0
 				".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false);
 
 		return db_query($sql);
 	}
 	
-	public static function getMarketOrders($c_currency,$currency1) {
+	public static function getMarketOrders($c_currency,$currency) {
 		global $CFG;
 		
-		if (!$c_currency || !$currency1)
+		if (!$c_currency || !$currency)
 			return false;
 		
 		$not_convertible = Currencies::getNotConvertible();
-		$sql = 'SELECT orders.order_type, orders.btc_price AS orig_btc_price, orders.btc AS btc_outstanding, orders.currency, orders.market_price AS is_market, orders.id, orders.site_user, orders.stop_price FROM orders WHERE orders.market_price = "Y" AND c_currency = '.$c_currency.' AND orders.currency != '.$c_currency.' '.(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency_info['id'].' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : '');
+		$sql = 'SELECT orders.order_type, orders.btc_price AS orig_btc_price, orders.btc AS btc_outstanding, orders.currency, orders.currency AS currency_id, orders.market_price AS is_market, orders.id, orders.site_user, orders.stop_price FROM orders WHERE orders.market_price = "Y" AND c_currency = '.$c_currency.' AND orders.currency != '.$c_currency.' '.(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency.' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : '');
 		return db_query_array($sql);
 	}
 
@@ -497,8 +498,8 @@ class Orders {
 		$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 		$fiat_price = ($currency_info['id'] == $currency1['id']) ? $orig_order['btc_price'] : round($orig_order['btc_price'] * ($conversion + (($conversion * $CFG->currency_conversion_fee) * ($orig_order['order_type'] == $CFG->order_type_ask ? 1 : -1))),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 		$user_fee = FeeSchedule::getUserFees($orig_order['site_user']);
-		$user_balances = User::getBalances($orig_order['site_user'],array($currency,$c_currency),true);
-		$on_hold = User::getOnHold(1,$orig_order['site_user'],$user_fee,array($currency,$c_currency));
+		$user_balances = User::getBalances($orig_order['site_user'],array($currency1['id'],$c_currency),true);
+		$on_hold = User::getOnHold(1,$orig_order['site_user'],$user_fee,array($currency1['id'],$c_currency));
 		$fiat_on_hold = (!empty($on_hold[$currency1['currency']]['total'])) ? $on_hold[$currency1['currency']]['total'] : 0;
 		$btc_on_hold = (!empty($on_hold[$CFG->currencies[$c_currency]['currency']]['total'])) ? $on_hold[$CFG->currencies[$c_currency]['currency']]['total'] : 0;
 		$btc_balance = (!empty($user_balances[strtolower($CFG->currencies[$c_currency]['currency'])])) ? $user_balances[strtolower($CFG->currencies[$c_currency]['currency'])] : 0;
@@ -598,11 +599,11 @@ class Orders {
 
 		if ($result) {
 			if ($result[0]['price'] > 0 && (!$stop_price || $result[0]['price'] > $stop_price) && !($buy && $result[0]['price'] > $price))
-				return array('error'=>array('message'=>Lang::string('buy-errors-outbid-self').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],2),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_OUTBID_SELF'));
+				return array('error'=>array('message'=>Lang::string('buy-errors-outbid-self').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_OUTBID_SELF'));
 			elseif ($buy && !empty($result[0]['stop_price']) && $result[0]['stop_price'] > 0)
-				return array('error'=>array('message'=>Lang::string('buy-limit-under-stops').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['stop_price'],2),' '.Lang::string('limit-min-price')) : ''),'code'=>'ORDER_BUY_LIMIT_UNDER_STOPS'));
+				return array('error'=>array('message'=>Lang::string('buy-limit-under-stops').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['stop_price'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),' '.Lang::string('limit-min-price')) : ''),'code'=>'ORDER_BUY_LIMIT_UNDER_STOPS'));
 			elseif (!$buy && $result[0]['price'] > 0 && $stop_price && $result[0]['price'] <= $stop_price)
-				return array('error'=>array('message'=>Lang::string('sell-limit-under-stops').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],2),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_BUY_LIMIT_UNDER_STOPS'));
+				return array('error'=>array('message'=>Lang::string('sell-limit-under-stops').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_BUY_LIMIT_UNDER_STOPS'));
 		}
 		
 		return false;
@@ -641,7 +642,7 @@ class Orders {
 		
 		if ($market_price) {
 			$type = (!$buy) ? $CFG->order_type_bid : $CFG->order_type_ask;
-			$sql = 'SELECT id FROM orders WHERE c_currency = '.$c_currency.' order_type = '.$type.' AND site_user != '.$user_id.' LIMIT 0,1';
+			$sql = 'SELECT id FROM orders WHERE c_currency = '.$c_currency.' AND order_type = '.$type.' AND site_user != '.$user_id.' LIMIT 0,1';
 			$result = db_query_array($sql);
 			if (!$result)
 				return array('error'=>array('message'=>Lang::string('buy-errors-no-compatible'),'code'=>'ORDER_MARKET_NO_COMPATIBLE'));
@@ -856,7 +857,7 @@ class Orders {
 					
 					if (!(round($max_amount,8,PHP_ROUND_HALF_UP) > 0) || !(round($max_comp_amount,8,PHP_ROUND_HALF_UP) > 0)) {
 						if ($comp_funds_finished)
-							self::cancelOrder($comp_order['id'],$comp_order['btc_outstanding'],$c_currency1);
+							self::cancelOrder($comp_order['id'],$comp_order['btc_outstanding'],$c_currency1,$comp_order['site_user']);
 						
 						$i++;
 						continue;
@@ -924,7 +925,7 @@ class Orders {
 								$hidden_executions[] = $comp_order;
 						}
 						else
-							self::cancelOrder($comp_order['id'],$comp_order_outstanding,$c_currency1);
+							self::cancelOrder($comp_order['id'],$comp_order_outstanding,$c_currency1,$comp_order['site_user']);
 					}
 					else {
 						self::setStatus($comp_order['id'],'FILLED');
@@ -1043,7 +1044,7 @@ class Orders {
 					self::$bid_ask[$c_currency_info['currency']][$currency_info['currency']]['bid'] = $comp_order['fiat_price'];
 					$bid = self::$bid_ask[$c_currency_info['currency']][$currency_info['currency']]['bid'];
 					$ask = self::$bid_ask[$c_currency_info['currency']][$currency_info['currency']]['ask'];
-					$comp_order = array_merge($comp_order,$comp_user_info);											
+					$comp_order = array_merge($comp_order,$comp_user_info);
 					$comp_fiat_this_on_hold = $comp_order['fiat_on_hold'] - (($comp_order['btc_outstanding'] * $comp_order['orig_btc_price']) + (($comp_order['fee1'] * 0.01) * ($comp_order['btc_outstanding'] * $comp_order['orig_btc_price'])));
 					$max_amount = (($this_btc_balance - $this_btc_on_hold) > $amount) ? $amount : $this_btc_balance - $this_btc_on_hold;
 					$max_comp_amount = ((($comp_order['fiat_balance'] - $comp_fiat_this_on_hold) / $comp_order['orig_btc_price']) > ($comp_order['btc_outstanding'] + (($comp_order['fee1'] * 0.01) * $comp_order['btc_outstanding']))) ? $comp_order['btc_outstanding'] : (($comp_order['fiat_balance'] - $comp_fiat_this_on_hold) / $comp_order['orig_btc_price']) - (($comp_order['fee1'] * 0.01) * (($comp_order['fiat_balance'] - $comp_fiat_this_on_hold) / $comp_order['orig_btc_price']));
@@ -1052,7 +1053,7 @@ class Orders {
 					
 					if (!(round($max_amount,8,PHP_ROUND_HALF_UP) > 0) || !(round($max_comp_amount,8,PHP_ROUND_HALF_UP) > 0)) {
 						if ($comp_funds_finished)
-							self::cancelOrder($comp_order['id'],$comp_order['btc_outstanding'],$c_currency1);
+							self::cancelOrder($comp_order['id'],$comp_order['btc_outstanding'],$c_currency1,$comp_order['site_user']);
 						
 						$i++;
 						continue;
@@ -1124,7 +1125,7 @@ class Orders {
 								$hidden_executions[] = $comp_order;
 						}
 						else
-							self::cancelOrder($comp_order['id'],$comp_order_outstanding,$c_currency1);
+							self::cancelOrder($comp_order['id'],$comp_order_outstanding,$c_currency1,$comp_order['site_user']);
 					}
 					else {
 						self::setStatus($comp_order['id'],'FILLED');
@@ -1266,16 +1267,16 @@ class Orders {
 		}
 	}
 	
-	private static function cancelOrder($order_id,$outstanding_btc,$c_currency) {
+	private static function cancelOrder($order_id,$outstanding_btc,$c_currency,$site_user=false) {
 		global $CFG;
 		
 		if (!$CFG->session_active || !$outstanding_btc || !$c_currency)
 			return false;
 		
-		$user_info = array();
+		$user_info = ($site_user > 0) ? DB::getRecord('site_users',$site_user,0,1) : User::$info;
 		$user_info['amount'] = number_format($outstanding_btc,8);
 		$user_info['exchange_name'] = $CFG->exchange_name;
-		$user_info['c_currency'] = $c_currency;
+		$user_info['c_currency'] = $CFG->currencies[$c_currency]['currency'];
 		$CFG->language = $user_info['last_lang'];
 		
 		if ($order_id) {

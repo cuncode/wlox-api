@@ -57,7 +57,7 @@ class Stats {
 		
 		$wallet = Wallets::getWallet($c_currency_info['id']);
 		if ($CFG->memcached) {
-			$cached = $CFG->m->get('stats_'.$currency_info['c_currency'].'_'.$currency_info['currency']);
+			$cached = $CFG->m->get('stats_'.$c_currency_info['currency'].'_'.$currency_info['currency']);
 			if ($cached) {
 				return $cached;
 			}
@@ -91,6 +91,7 @@ class Stats {
 		if ($result[0]['btc_price3'])
 			$result[0]['btc_price3'] = $result[0]['btc_price3'] * (($currency_info['currency'] == 'USD') ? $CFG->currencies[$result[0]['last_transaction_currency3']][$usd_field] : $CFG->currencies[$result[0]['last_transaction_currency3']][$usd_field] / $currency_info[$usd_field]);
 		
+		$stats['market'] = $c_currency_info['currency'];
 		$stats['bid'] = $bid;
 		$stats['ask'] = $ask;
 		$stats['last_price'] = ($result[0]['btc_price2']) ? $result[0]['btc_price2'] : $ask;
@@ -104,8 +105,8 @@ class Stats {
 		$stats['total_btc_traded'] = $result[0]['btc_24h'];
 		$stats['total_btc'] = $result[0]['global_btc'];
 		$stats['global_btc'] = $result[0]['global_btc'];
-		$stats['market_cap'] = $result[0]['market_cap'];
-		$stats['trade_volume'] = $result[0]['trade_volume'];
+		$stats['market_cap'] = $result[0]['market_cap']/$currency_info['usd_ask'];
+		$stats['trade_volume'] = $result[0]['trade_volume']/$currency_info['usd_ask'];
 		$stats['btc_24h'] = $result[0]['btc_24h'];
 		$stats['btc_24h_buy'] = $result[0]['btc_24h_b'];
 		$stats['btc_24h_sell'] = $result[0]['btc_24h_s'];
@@ -114,7 +115,7 @@ class Stats {
 		$stats['btc_1h_sell'] = $result[0]['btc_1h_s'];
 		
 		if ($CFG->memcached) {
-			$key = 'stats_'.$currency_info['c_currency'].'_'.$currency_info['currency'];
+			$key = 'stats_'.$c_currency_info['currency'].'_'.$currency_info['currency'];
 			$set[$key] = $stats;
 			memcached_safe_set($set,300);
 		}
@@ -124,10 +125,12 @@ class Stats {
 	
 	public static function getBTCTraded($c_currency_id) {
 		global $CFG;
-		
+				
 		$c_currency_info = $CFG->currencies[$c_currency_id];
-		if (empty($c_currency_info))
-			return false;
+		if (empty($c_currency_info)) {
+			$main = Currencies::getMain();
+			$c_currency_info = $CFG->currencies[$main['crypto']];
+		}
 
 		if ($CFG->memcached && empty($CFG->m_skip)) {
 			$cached = $CFG->m->get('btc_traded_'.$c_currency_id);

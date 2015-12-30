@@ -6,6 +6,7 @@ class Transactions {
 		if ($user && !(User::$info['id'] > 0))
 			return false;
 		
+		$cryptos = Currencies::getCryptos();
 		$currency_info = (!empty($CFG->currencies[$currency])) ? $CFG->currencies[$currency] : false;
 		$c_currency_info = (!empty($CFG->currencies[$c_currency])) ? $CFG->currencies[$c_currency] : false;
 		if ($currency_info)
@@ -84,7 +85,7 @@ class Transactions {
 		$currency_abbr3 .= ' END)';
 		
 		if (!$count && !$public_api_all)
-			$sql = "SELECT transactions.id,transactions.c_currency, transactions.date,transactions.site_user,transactions.site_user1,transactions.btc,transactions.currency,transactions.currency1,transactions.btc_price,transactions.orig_btc_price,transactions.fiat, (UNIX_TIMESTAMP(transactions.date) - ({$CFG->timezone_offset})) AS time_since ".(($user > 0) ? ",IF(transactions.site_user = $user,transaction_types.name_{$CFG->language},transaction_types1.name_{$CFG->language}) AS type, IF(transactions.site_user = $user,transactions.fee,transactions.fee1) AS fee, IF(transactions.site_user = $user,transactions.btc_net,transactions.btc_net1) AS btc_net, IF(transactions.site_user1 = $user,transactions.orig_btc_price,transactions.btc_price) AS fiat_price, IF(transactions.site_user = $user,transactions.currency,transactions.currency1) AS currency" : ", ROUND($price_str,2) AS btc_price, LOWER(transaction_types1.name_en) AS maker_type").", UNIX_TIMESTAMP(transactions.date) AS datestamp ".(($order_by == 'usd_price') ? ', ROUND(('.$usd_str.' * transactions.btc_price),2) AS usd_price' : '').(($order_by == 'usd_amount') ? ', ROUND(('.$usd_str.' * transactions.fiat),2) AS usd_amount' : '');
+			$sql = "SELECT transactions.id,transactions.c_currency, transactions.date,transactions.site_user,transactions.site_user1,transactions.btc,transactions.currency,transactions.currency1,transactions.btc_price,transactions.orig_btc_price,transactions.fiat, (UNIX_TIMESTAMP(transactions.date) - ({$CFG->timezone_offset})) AS time_since ".(($user > 0) ? ",IF(transactions.site_user = $user,transaction_types.name_{$CFG->language},transaction_types1.name_{$CFG->language}) AS type, IF(transactions.site_user = $user,transactions.fee,transactions.fee1) AS fee, IF(transactions.site_user = $user,transactions.btc_net,transactions.btc_net1) AS btc_net, IF(transactions.site_user1 = $user,transactions.orig_btc_price,transactions.btc_price) AS fiat_price, IF(transactions.site_user = $user,transactions.currency,transactions.currency1) AS currency" : ", ROUND($price_str,2) AS btc_price, LOWER(transaction_types1.name_en) AS maker_type").", UNIX_TIMESTAMP(transactions.date) AS datestamp ".(($order_by == 'usd_price') ? ', ROUND(('.$usd_str.' * transactions.btc_price),2) AS usd_price' : '').(($order_by == 'usd_amount') ? ', ROUND(('.$usd_str.' * transactions.fiat),2) AS usd_amount' : '').(count($cryptos) > 0 && $user ? ', IF(IF(transactions.site_user = '.$user.',transactions.currency,transactions.currency1) IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto' : '');
 		elseif ($public_api_all && $user)
 			$sql = "SELECT transactions.id AS id, transactions.date AS date, UNIX_TIMESTAMP(transactions.date) AS `timestamp`, transactions.btc AS btc, LOWER(IF(transactions.site_user = $user,transaction_types.name_{$CFG->language},transaction_types1.name_{$CFG->language})) AS side, IF(transactions.site_user1 = $user,transactions.orig_btc_price,transactions.btc_price) AS price, ROUND((IF(transactions.site_user1 = $user,transactions.orig_btc_price,transactions.btc_price) * IF(transactions.site_user = $user,transactions.btc_net,transactions.btc_net1)),2) AS amount, ROUND((IF(transactions.site_user1 = $user,transactions.orig_btc_price,transactions.btc_price) * IF(transactions.site_user = $user,transactions.fee,transactions.fee1)),2) AS fee, $currency_abbr AS currency ";
 		elseif ($public_api_all && !$user && $currency)
@@ -98,8 +99,10 @@ class Transactions {
 		FROM transactions
 		LEFT JOIN transaction_types ON (transaction_types.id = transactions.transaction_type)
 		LEFT JOIN transaction_types transaction_types1 ON (transaction_types1.id = transactions.transaction_type1)
-		WHERE c_currency = '.$c_currency_info['id'].' ';
+		WHERE 1 ';
 			
+		if ($c_currency > 0)
+			$sql .= ' AND transactions.c_currency = '.$c_currency.' ';
 		if ($user > 0)
 			$sql .= " AND (transactions.site_user = $user OR transactions.site_user1 = $user) ";
 		if ($start_date > 0)

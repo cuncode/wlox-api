@@ -89,13 +89,8 @@ class Requests{
 			return $result[0]['total'];
 	}
 	
-	public static function insert($is_btc=false,$bank_account_currency=false,$amount=false,$btc_address=false,$account_number=false) {
+	public static function insert($currency=false,$amount=false,$btc_address=false,$account_number=false) {
 		global $CFG;
-		
-		$bank_account_currency = preg_replace("/[^0-9]/", "",$bank_account_currency);
-		$amount = preg_replace("/[^0-9\.]/", "",$amount);
-		$account_number = preg_replace("/[^0-9]/", "",$account_number);
-		$btc_address = preg_replace("/[^0-9a-zA-Z]/",'',$btc_address);
 		
 		if (!$CFG->session_active)
 			return false;
@@ -103,30 +98,34 @@ class Requests{
 		if ($CFG->withdrawals_status == 'suspended')
 			return false;
 		
+		$currency = preg_replace("/[^0-9]/", "",$currency);
+		$amount = preg_replace("/[^0-9\.]/", "",$amount);
+		$account_number = preg_replace("/[^0-9]/", "",$account_number);
+		$btc_address = preg_replace("/[^0-9a-zA-Z]/",'',$btc_address);
+		
+		if (!array_key_exists($currency,$CFG->currencies))
+			return false;
+		
+		$currency_info = $CFG->currencies[$currency];
 		$available = User::getAvailable();
+		$is_crypto = ($currency_info['is_crypto'] == 'Y');
+		$amount = round($amount,$is_crypto,PHP_ROUND_HALF_UP);
+		if ($amount > $available[$currency_info['currency']])
+			return false;
 		
-		if ($is_btc) {
-			if (round($amount,8) > round($available['BTC'],8))
-				return false;
-		}
-		else {
-			$currency_info = $CFG->currencies[$bank_account_currency];
-			if ($amount > $available[$currency_info['currency']])
-				return false;
-		}
-		
-		if ($is_btc) {
+		if ($is_crypto) {
 			if (((User::$info['verified_authy'] == 'Y'|| User::$info['verified_google'] == 'Y')) && User::$info['confirm_withdrawal_2fa_btc'] == 'Y' && !($CFG->token_verified || $CFG->session_api))
 				return false;
 			if (((User::$info['verified_authy'] == 'Y'|| User::$info['verified_google'] == 'Y') && User::$info['confirm_withdrawal_2fa_bank'] == 'Y') && !($CFG->token_verified || $CFG->session_api))
 				return false;
 			
+			$wallet = Wallets::getWallet($currency);
 			$status = (User::$info['confirm_withdrawal_email_btc'] == 'Y' && !($CFG->token_verified || $CFG->session_api)) ? $CFG->request_awaiting_id : $CFG->request_pending_id;
-			$request_id = db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$CFG->btc_currency_id,'amount'=>$amount,'description'=>$CFG->withdraw_btc_desc,'request_status'=>$status,'request_type'=>$CFG->request_withdrawal_id,'send_address'=>$btc_address,'fee'=>$CFG->bitcoin_sending_fee,'net_amount'=>($amount - $CFG->bitcoin_sending_fee)));
-			db_insert('history',array('date'=>date('Y-m-d H:i:s'),'ip'=>$CFG->client_ip,'history_action'=>$CFG->history_withdraw_id,'site_user'=>User::$info['id'],'request_id'=>$request_id,'bitcoin_address'=>$btc_address,'balance_before'=>User::$info['btc'],'balance_after'=>(User::$info['btc'] - $amount)));
+			$request_id = db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$currency,'amount'=>$amount,'description'=>$CFG->withdraw_btc_desc,'request_status'=>$status,'request_type'=>$CFG->request_withdrawal_id,'send_address'=>$btc_address,'fee'=>$wallet['bitcoin_sending_fee'],'net_amount'=>($amount - $wallet['bitcoin_sending_fee'])));
+			db_insert('history',array('date'=>date('Y-m-d H:i:s'),'ip'=>$CFG->client_ip,'history_action'=>$CFG->history_withdraw_id,'site_user'=>User::$info['id'],'request_id'=>$request_id,'bitcoin_address'=>$btc_address,'balance_before'=>User::$info[strtolower($currency_info['currency'])],'balance_after'=>(User::$info[strtolower($currency_info['currency'])] - $amount)));
 			
 			if (User::$info['confirm_withdrawal_email_btc'] == 'Y' && !($CFG->token_verified || $CFG->session_api) && $request_id > 0) {
-				Status::sumFields(array('pending_withdrawals'=>$amount));
+				Wallets::sumFields($wallet['id'],array('pending_withdrawals'=>$amount));
 				$email_token = User::randomPassword(12);
 				$vars = User::$info;
 				$vars['authcode'] = urlencode(Encryption::encrypt($email_token));
@@ -138,12 +137,12 @@ class Requests{
 			}
 			elseif (User::$info['notify_withdraw_btc'] == 'Y') {
 		        $info['amount'] = $amount;
-		        $info['currency'] = 'BTC';
+		        $info['currency'] = $currency_info['currency'];
 		        $info['first_name'] = User::$info['first_name'];
 		        $info['last_name'] = User::$info['last_name'];
 		        $info['id'] = $request_id;
 		        $email = SiteEmail::getRecord('new-withdrawal');
-		        Email::send($CFG->form_email,User::$info['email'],str_replace('[amount]',$amount,str_replace('[currency]','BTC',$email['title'])),$CFG->form_email_from,false,$email['content'],$info);
+		        Email::send($CFG->form_email,User::$info['email'],str_replace('[amount]',$amount,str_replace('[currency]',$currency_info['currency'],$email['title'])),$CFG->form_email_from,false,$email['content'],$info);
 			}
 		}
 		else {
@@ -152,7 +151,7 @@ class Requests{
 
 			$amount = round($amount,2,PHP_ROUND_HALF_UP);
 			$status = (User::$info['confirm_withdrawal_email_bank'] == 'Y' && !($CFG->token_verified || $CFG->session_api)) ? $CFG->request_awaiting_id : $CFG->request_pending_id;
-			$request_id = db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$bank_account_currency,'amount'=>$amount,'description'=>$CFG->withdraw_fiat_desc,'request_status'=>$status,'request_type'=>$CFG->request_withdrawal_id,'account'=>$account_number,'fee'=>$CFG->fiat_withdraw_fee,'net_amount'=>($amount - $CFG->fiat_withdraw_fee)));
+			$request_id = db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$currency,'amount'=>$amount,'description'=>$CFG->withdraw_fiat_desc,'request_status'=>$status,'request_type'=>$CFG->request_withdrawal_id,'account'=>$account_number,'fee'=>$CFG->fiat_withdraw_fee,'net_amount'=>($amount - $CFG->fiat_withdraw_fee)));
 			db_insert('history',array('date'=>date('Y-m-d H:i:s'),'ip'=>$CFG->client_ip,'history_action'=>$CFG->history_withdraw_id,'site_user'=>User::$info['id'],'request_id'=>$request_id,'balance_before'=>User::$info[strtolower($currency_info['currency'])],'balance_after'=>(User::$info[strtolower($currency_info['currency'])] - $amount)));
 			
 			if (User::$info['confirm_withdrawal_email_bank'] == 'Y' && !($CFG->token_verified || $CFG->session_api) && $request_id > 0) {
