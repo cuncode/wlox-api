@@ -6,8 +6,12 @@ class Wallets {
 		if (!array_key_exists($c_currency,$CFG->currencies))
 			return false;
 		
-		$currency = $CFG->currencies[$c_currency]['id'];
-		return DB::getRecord('wallets',$c_currency,0,1);
+		$sql = 'SELECT * FROM wallets WHERE c_currency = '.$c_currency.' LIMIT 0,1';
+		$result = db_query_array($sql);
+		if ($result)
+			return $result[0];
+		else
+			return false;
 	}
 	
 	public static function sumFields($wallet_id,$fields) {
