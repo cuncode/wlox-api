@@ -3,10 +3,19 @@ class Stats {
 	public static function getHistorical($timeframe='1mon',$c_currency,$currency,$public_api=false) {
 		global $CFG;
 		
+		$main = Currencies::getMain();
 		$currency = preg_replace("/[^0-9]/", "",$currency);
 		$c_currency = preg_replace("/[^0-9]/", "",$c_currency);
-		$currency_info = $CFG->currencies[strtoupper($currency)];
-		$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
+		
+		if (empty($CFG->currencies[strtoupper($currency)]))
+			$currency_info = $CFG->currencies[$main['fiat']];
+		else
+			$currency_info = $CFG->currencies[strtoupper($currency)];
+		
+		if (empty($CFG->currencies[strtoupper($c_currency)]))
+			$currency_info = $CFG->currencies[$main['crypto']];
+		else
+			$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
 		
 		if (empty($currency_info) || empty($c_currency_info))
 			return false;
