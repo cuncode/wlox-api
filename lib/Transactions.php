@@ -6,9 +6,19 @@ class Transactions {
 		if ($user && !(User::$info['id'] > 0))
 			return false;
 		
+		$main = Currencies::getMain();
 		$cryptos = Currencies::getCryptos();
-		$currency_info = (!empty($CFG->currencies[$currency])) ? $CFG->currencies[$currency] : false;
-		$c_currency_info = (!empty($CFG->currencies[$c_currency])) ? $CFG->currencies[$c_currency] : false;
+		
+		if (empty($CFG->currencies[strtoupper($currency)]))
+			$currency_info = $CFG->currencies[$main['fiat']];
+		else
+			$currency_info = $CFG->currencies[strtoupper($currency)];
+		
+		if (empty($CFG->currencies[strtoupper($c_currency)]))
+			$currency_info = $CFG->currencies[$main['crypto']];
+		else
+			$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
+		
 		if ($currency_info)
 			$currency = $currency_info['id'];
 		if ($c_currency_info)
