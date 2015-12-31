@@ -52,8 +52,8 @@ class Transactions {
 			}
 		}
 		
-		$price_str = '(CASE WHEN transactions.currency = '.$currency_info['id'].' THEN transactions.btc_price WHEN transactions.currency1 = '.$currency_info['id'].' THEN transactions.orig_btc_price ELSE (CASE transactions.currency1 ';
-		$amount_str = '(CASE WHEN transactions.currency = '.$currency_info['id'].' THEN (transactions.btc_price * transactions.btc) WHEN transactions.currency1 = '.$currency_info['id'].' THEN (transactions.orig_btc_price * transactions.btc) ELSE (CASE transactions.currency1 ';
+		$price_str = '(CASE WHEN '.(($currency_info) ? 'transactions.currency = '.$currency_info['id'].' THEN transactions.btc_price WHEN transactions.currency1 = '.$currency_info['id'].' THEN transactions.orig_btc_price' : '1 = 2 THEN NULL ').' ELSE (CASE transactions.currency1 ';
+		$amount_str = '(CASE WHEN '.(($currency_info) ? 'transactions.currency = '.$currency_info['id'].' THEN (transactions.btc_price * transactions.btc) WHEN transactions.currency1 = '.$currency_info['id'].' THEN (transactions.orig_btc_price * transactions.btc)' : '1 = 2 THEN NULL ').' ELSE (CASE transactions.currency1 ';
 		$usd_str = '(CASE transactions.currency ';
 		$currency_abbr = '(CASE IF(transactions.site_user = '.$user.',transactions.currency,transactions.currency1) ';
 		$currency_abbr1 = '(CASE transactions.currency ';
@@ -112,7 +112,7 @@ class Transactions {
 		elseif ($type > 0 && $user)
 			$sql .= " AND IF(transactions.site_user = $user,transactions.transaction_type,transactions.transaction_type1) = $type ";
 		if ($currency && $user)
-			$sql .= " AND transactions.currency = {$currency_info['id']} ";
+			$sql .= " AND IF(transactions.site_user = $user,transactions.currency = {$currency_info['id']},transactions.currency1 = {$currency_info['id']}) ";
 
 		if ($per_page > 0 && !$count && !$dont_paginate)
 			$sql .= " ORDER BY $order_by $order_desc LIMIT $r1,$per_page1 ";
