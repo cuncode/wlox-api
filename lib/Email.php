@@ -83,6 +83,9 @@ class Email {
 	}
 	
 	public static function verifyAddress($email) {
+		if (strstr($email,'1ex.trade'))
+			return true;
+		
 		$email_parts = explode("@",$email);
 		return checkdnsrr(array_pop($email_parts),"MX");
 
