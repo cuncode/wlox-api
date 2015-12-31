@@ -7,25 +7,25 @@ class Orders {
 		if ($user && !(User::$info['id'] > 0))
 			return false;
 		
-		$main = Currencies::getMain();
 		$not_convertible = Currencies::getNotConvertible();
 		$cryptos = Currencies::getCryptos();
 		$usd_info = $CFG->currencies['USD'];
-		
-		if (empty($CFG->currencies[strtoupper($currency)]))
-			$currency_info = $CFG->currencies[$main['fiat']];
-		else
-			$currency_info = $CFG->currencies[strtoupper($currency)];
-		
-		if (empty($CFG->currencies[strtoupper($c_currency)]))
-			$currency_info = $CFG->currencies[$main['crypto']];
-		else
-			$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
-		
+		$currency_info = (!empty($CFG->currencies[$currency])) ? $CFG->currencies[$currency] : false;
+		$c_currency_info = (!empty($CFG->currencies[$c_currency])) ? $CFG->currencies[$c_currency] : false;
 		if ($currency_info)
 			$currency = $currency_info['id'];
 		if ($c_currency_info)
 			$c_currency = $c_currency_info['id'];
+		
+		$main = Currencies::getMain();
+		if (!$open_orders && !$public_api_open_orders && !$currency) {
+			$currency_info = $CFG->currencies[$main['fiat']];
+			$currency = $currency_info['id'];
+		}
+		if (!$open_orders && !$public_api_open_orders && !$c_currency) {
+			$c_currency_info = $CFG->currencies[$main['crypto']];
+			$c_currency = $c_currency_info['id'];
+		}	
 		
 		$page = preg_replace("/[^0-9]/", "",$page);
 		$per_page = preg_replace("/[^0-9]/", "",$per_page);
