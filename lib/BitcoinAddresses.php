@@ -62,7 +62,7 @@ class BitcoinAddresses{
 		require_once('../lib/easybitcoin.php');
 		$bitcoin = new Bitcoin($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port'],$wallet['bitcoin_protocol']);
 		
-		$new_address = $bitcoin->getnewaddress($CFG->bitcoin_accountname);
+		$new_address = $bitcoin->getnewaddress($wallet['bitcoin_accountname']);
 		$new_id = db_insert('bitcoin_addresses',array('c_currency'=>$c_currency,'address'=>$new_address,'site_user'=>User::$info['id'],'date'=>date('Y-m-d H:i:s')));
 		
 		return ($return_address) ? $new_address : $new_id;
