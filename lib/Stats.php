@@ -5,8 +5,8 @@ class Stats {
 		
 		$currency = preg_replace("/[^0-9]/", "",$currency);
 		$c_currency = preg_replace("/[^0-9]/", "",$c_currency);
-		$currency_info = $CFG->currencies[$currency];
-		$c_currency_info = $CFG->currencies[$c_currency];
+		$currency_info = $CFG->currencies[strtoupper($currency)];
+		$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
 		
 		if (empty($currency_info) || empty($c_currency_info))
 			return false;
