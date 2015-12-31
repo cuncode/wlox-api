@@ -109,7 +109,7 @@ class Requests{
 		$currency_info = $CFG->currencies[$currency];
 		$available = User::getAvailable();
 		$is_crypto = ($currency_info['is_crypto'] == 'Y');
-		$amount = round($amount,$is_crypto,PHP_ROUND_HALF_UP);
+		$amount = round($amount,($is_crypto ? 8 : 2),PHP_ROUND_HALF_UP);
 		if ($amount > $available[$currency_info['currency']])
 			return false;
 		
@@ -118,7 +118,7 @@ class Requests{
 				return false;
 			if (((User::$info['verified_authy'] == 'Y'|| User::$info['verified_google'] == 'Y') && User::$info['confirm_withdrawal_2fa_bank'] == 'Y') && !($CFG->token_verified || $CFG->session_api))
 				return false;
-			
+
 			$wallet = Wallets::getWallet($currency);
 			$status = (User::$info['confirm_withdrawal_email_btc'] == 'Y' && !($CFG->token_verified || $CFG->session_api)) ? $CFG->request_awaiting_id : $CFG->request_pending_id;
 			$request_id = db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$currency,'amount'=>$amount,'description'=>$CFG->withdraw_btc_desc,'request_status'=>$status,'request_type'=>$CFG->request_withdrawal_id,'send_address'=>$btc_address,'fee'=>$wallet['bitcoin_sending_fee'],'net_amount'=>($amount - $wallet['bitcoin_sending_fee'])));
