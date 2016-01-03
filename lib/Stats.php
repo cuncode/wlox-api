@@ -13,7 +13,7 @@ class Stats {
 			$currency_info = $CFG->currencies[strtoupper($currency)];
 		
 		if (empty($CFG->currencies[strtoupper($c_currency)]))
-			$currency_info = $CFG->currencies[$main['crypto']];
+			$c_currency_info = $CFG->currencies[$main['crypto']];
 		else
 			$c_currency_info = $CFG->currencies[strtoupper($c_currency)];
 		
