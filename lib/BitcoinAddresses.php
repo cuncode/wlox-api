@@ -12,6 +12,11 @@ class BitcoinAddresses{
 		$per_page = preg_replace("/[^0-9]/", "",$per_page);
 		$c_currency = preg_replace("/[^0-9]/", "",$c_currency);
 		
+		if (empty($CFG->currencies[strtoupper($c_currency)]))
+			$c_currency = $CFG->currencies[$main['crypto']]['id'];
+		else
+			$c_currency = $CFG->currencies[strtoupper($c_currency)]['id'];
+		
 		$page = ($page > 0) ? $page - 1 : 0;
 		$r1 = $page * $per_page;
 		$user = User::$info['id'];
