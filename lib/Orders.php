@@ -637,8 +637,8 @@ class Orders {
 		
 		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
-
-		if (($subtotal * $currency_info['usd_ask']) < $CFG->orders_min_usd || $subtotal < 0.00000001 || $price > 9999999999999999 || ($buy ? (($amount * $current_ask) < 0.01) : (($amount * $current_bid) < 0.01)))
+		
+		if (($subtotal * $currency_info['usd_ask']) < $CFG->orders_min_usd || $subtotal < 0.00000001 || $price > 9999999999999999 || ($buy ? (($amount * $current_ask) < 0.01 && $current_ask > 0) : (($amount * $current_bid) < 0.01  && $current_bid > 0)))
 			return array('error'=>array('message'=>str_replace('[amount]',number_format(($CFG->orders_min_usd/$currency_info['usd_ask']),2),str_replace('[fa_symbol]',$currency_info['fa_symbol'],Lang::string('buy-errors-too-little'))),'code'=>'ORDER_UNDER_MINIMUM'));
 		
 		if ((($buy && $stop_price > 0 && $stop_price <= $current_ask) || (!$buy && $stop_price >= $current_bid)) && $stop_price > 0)
