@@ -30,7 +30,7 @@ class BankAccounts{
 		$id = preg_replace("/[^0-9]/", "",$id);
 		$account_number = preg_replace("/[^0-9]/", "",$account_number);
 		
-		if (!$CFG->session_active && !(($id > 0) || $account_number > 0))
+		if (!$CFG->session_active || !($id > 0 || $account_number > 0))
 			return false;
 		
 		$sql = 'SELECT * FROM bank_accounts WHERE '.(($id > 0) ? " id = $id " : " account_number = $account_number ").' AND site_user = '.User::$info['id'];

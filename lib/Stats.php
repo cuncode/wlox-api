@@ -139,6 +139,7 @@ class Stats {
 		if (empty($c_currency_info)) {
 			$main = Currencies::getMain();
 			$c_currency_info = $CFG->currencies[$main['crypto']];
+			$c_currency_id = $c_currency_info['id'];
 		}
 
 		if ($CFG->memcached && empty($CFG->m_skip)) {
