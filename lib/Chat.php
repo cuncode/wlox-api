@@ -6,8 +6,8 @@ class Chat{
 		if ($CFG->memcached) {
 			$cached = $CFG->m->get('chat');
 			if ($cached) {
+				$orig_messages = array();
 				if ($last_id > 0) {
-					$orig_messages = array();
 					if (!empty($cached['messages']) && is_array($cached['messages'])) {
 						$orig_messages = $cached['messages'];
 						foreach ($cached['messages'] as $k => $message) {
@@ -17,9 +17,9 @@ class Chat{
 					}
 				}
 				
-				if (count($cached['messages']) > 0) {
+				if ($last_id > 0 && count($cached['messages']) > 0) {
 					$cached['lastId'] = $cached['messages'][0]['id'];
-					$CFG->m->set('chat',array('numUsers'=>$total,'messages'=>$orig_messages,'lastId'=>$cached['messages'][0]['id']),300);
+					$CFG->m->set('chat',array('numUsers'=>$cached['numUsers'],'messages'=>$orig_messages,'lastId'=>$cached['messages'][0]['id']),300);
 				}
 				return $cached;
 			}
@@ -57,11 +57,11 @@ class Chat{
 				if (empty($cached['messages']))
 					$cached['messages'][] = array('id'=>$id,'message'=>$message,'username'=>$handle,'site_user'=>User::$info['id']);
 				else
-					$cached['messages'] = array(array('id'=>$id,'message'=>$message,'username'=>$handle,'site_user'=>User::$info['id'])) + $cached['messages'];
+					$cached['messages'] = array_merge(array(array('id'=>$id,'message'=>$message,'username'=>$handle,'site_user'=>User::$info['id'])),$cached['messages']);
 				
 				if (count($cached['messages']) > 30)
 					array_pop($cached['messages']);
-		
+				
 				$CFG->m->set('chat',$cached,300);
 			}
 		}
