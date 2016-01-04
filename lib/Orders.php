@@ -627,13 +627,13 @@ class Orders {
 		$fee_amount = ($fee * 0.01) * $subtotal;
 		$total = ($buy) ? round($subtotal + $fee_amount,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) : $subtotal - $fee_amount;
 		$user_id = (!$user_id) ? User::$info['id'] : $user_id;
-		$min_market_price = round($currency_info['min_price']/$currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+		$min_market_price = round($CFG->currencies[$c_currency]['min_price']/$currency_info['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 		
 		if ($price == $stop_price)
 			$price = 0;
 		
 		if ($price < $min_market_price)
-			return array('error'=>array('message'=>str_replace('[amount]',$currency_info['fa_symbol'].number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price')),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
+			return array('error'=>array('message'=>str_replace('[min]',$currency_info['fa_symbol'].number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price')),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
 		
 		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
