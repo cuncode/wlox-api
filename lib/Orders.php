@@ -1103,7 +1103,7 @@ class Orders {
 					$this_prev_btc = $this_btc_balance;
 					$this_prev_fiat = $this_fiat_balance;
 					$this_btc_balance -= $trans_amount;
-					$this_fiat_balance += round($this_trans_amount_net * $comp_order['fiat_price'],($CFG->currencies[$currency_info['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+					$this_fiat_balance += round($this_trans_amount_net * $comp_order['fiat_price'],($CFG->currencies[$currency_info['id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 					$trans_total += $trans_amount;
 					$max_price = ($comp_order['fiat_price'] > $max_price) ? $comp_order['fiat_price'] : $max_price;
 					$min_price = ($comp_order['fiat_price'] < $min_price || !($min_price > 0)) ? $comp_order['fiat_price'] : $min_price;
