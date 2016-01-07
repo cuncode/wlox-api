@@ -89,7 +89,7 @@ class Orders {
 			$price_str = 'orders.btc_price';
 		
 		if (!$count && !$public_api_open_orders && !$public_api_order_book)
-			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,'.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto,' : ''))." ".(($open_orders) ? 'ROUND('.$price_str_usd.','.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),8,2)' : '2').') AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
+			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,'.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto,' : ''))." ".(($open_orders) ? 'ROUND('.$price_str_usd.',2) AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
 		elseif (!$count && $public_api_order_book)
 			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, orders.btc AS order_amount, ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp`, $currency_abbr1 AS market ";
 		elseif (!$count && $public_api_open_orders)
@@ -1195,9 +1195,9 @@ class Orders {
 		db_commit();
 		
 		if ($max_price > 0)
-			db_update('currencies',$c_currency1,array('usd_ask'=>($max_price * $usd_info['usd_ask'])));
+			db_update('currencies',$c_currency1,array('usd_ask'=>($max_price * $currency_info['usd_ask'])));
 		if ($min_price > 0)
-			db_update('currencies',$c_currency1,array('usd_bid'=>($min_price * $usd_info['usd_ask'])));
+			db_update('currencies',$c_currency1,array('usd_bid'=>($min_price * $currency_info['usd_ask'])));
 		
 		if ($hidden_executions && !$external_transaction) {
 			foreach ($hidden_executions as $comp_order) {
