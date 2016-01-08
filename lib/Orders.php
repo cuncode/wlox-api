@@ -453,7 +453,7 @@ class Orders {
 				FROM orders
 				".(($market_price && !$get_all_market) ? 'JOIN (SELECT @running_total := 0) r' : '')."
 				WHERE c_currency = ".$c_currency." AND orders.currency != ".$c_currency."
-				".(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency.' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : '')."
+				".(($CFG->cross_currency_trades && count($not_convertible) > 0) ? (($currency_info['not_convertible'] == 'Y') ? ' AND orders.currency = '.$currency_info['id'].' ' : ' AND orders.currency NOT IN ('.implode(',',$not_convertible).')') : '')."
 				".((!$get_all_market) ? "AND orders.order_type = $type " : false)."
 				".((!$market_price) ? " AND (orders.btc_price $comparison $price_str1 OR orders.market_price = 'Y') " : false)."
 				".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)."
