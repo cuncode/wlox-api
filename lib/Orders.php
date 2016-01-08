@@ -116,9 +116,13 @@ class Orders {
 		$sql .= '
 		WHERE 1 ';
 		
-		if ($CFG->cross_currency_trades && count($not_convertible) > 0 && !$open_orders)
-			$sql .= ' AND (orders.currency = '.$currency_info['id'].' OR orders.currency NOT IN ('.implode(',',$not_convertible).')) ';
-			
+		if ($CFG->cross_currency_trades && count($not_convertible) > 0 && !$open_orders) {
+			if ($currency_info['not_convertible'] == 'Y')
+				$sql .= ' AND orders.currency = '.$currency_info['id'].' ';
+			else
+				$sql .= ' AND orders.currency NOT IN ('.implode(',',$not_convertible).') ';
+		}
+		
 		if ($user > 0)
 			$sql .= " AND orders.site_user = $user ";
 		else
@@ -152,7 +156,7 @@ class Orders {
 			$sql .= " ORDER BY price $order_desc";
 		if ($public_api_order_book)
 			$sql .= " ORDER BY price $order_desc LIMIT $r1,$per_page";
-		
+
 		$result = db_query_array($sql);
 		
 		if ($CFG->memcached && !$count) {
@@ -290,7 +294,7 @@ class Orders {
 			$price_str_ask = 'orders.btc_price';
 		}
 		
-		$sql = "SELECT ROUND(MAX(IF(orders.order_type = {$CFG->order_type_bid},$price_str_bid,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS bid, ROUND(MIN(IF(orders.order_type = {$CFG->order_type_ask},$price_str_ask,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS ask FROM orders WHERE orders.c_currency = ".$c_currency_info['id']." AND orders.currency != ".$c_currency_info['id']." ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : 'AND (orders.currency = '.$currency_info['id'].' '.((count($not_convertible) > 0) ? 'OR orders.currency NOT IN ('.implode(',',$not_convertible).')' : '').')')." AND orders.btc_price > 0 LIMIT 0,1";
+		$sql = "SELECT ROUND(MAX(IF(orders.order_type = {$CFG->order_type_bid},$price_str_bid,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS bid, ROUND(MIN(IF(orders.order_type = {$CFG->order_type_ask},$price_str_ask,NULL)),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS ask FROM orders WHERE orders.c_currency = ".$c_currency_info['id']." AND orders.currency != ".$c_currency_info['id']." ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : ((count($not_convertible) > 0) ? (($currency_info['not_convertible'] == 'Y') ? ' AND orders.currency = '.$currency_info['id'].' ' : ' AND orders.currency NOT IN ('.implode(',',$not_convertible).')') : ''))." AND orders.btc_price > 0 LIMIT 0,1";
 		$result = db_query_array($sql);
 		$res = ($result[0]) ? $result[0] : array('bid'=>0,'ask'=>0);
 		
@@ -301,7 +305,7 @@ class Orders {
 			$res['bid'] = $res['ask'];
 
 		if (!$res['ask'] && !$res['bid']) {
-			$sql = 'SELECT currency, currency1, btc_price, orig_btc_price FROM transactions WHERE c_currency = '.$c_currency_info['id'].' '.((!$CFG->cross_currency_trades) ? 'AND currency = '.$currency_info['id'] : 'AND (currency = '.$currency_info['id'].' OR currency1 = '.$currency_info['id'].' '.((count($not_convertible) > 0) ? 'OR currency NOT IN ('.implode(',',$not_convertible).') OR currency1 NOT IN ('.implode(',',$not_convertible).')' : '').')').' ORDER BY id DESC LIMIT 0,1';
+			$sql = 'SELECT currency, currency1, btc_price, orig_btc_price FROM transactions WHERE c_currency = '.$c_currency_info['id'].' '.((!$CFG->cross_currency_trades) ? 'AND currency = '.$currency_info['id'] : ((count($not_convertible) > 0) ? (($currency_info['not_convertible'] == 'Y') ? ' AND (currency = '.$currency_info['id'].' OR currency1 = '.$currency_info['id'].') ' : ' AND (currency NOT IN ('.implode(',',$not_convertible).') OR currency1 NOT IN ('.implode(',',$not_convertible).'))') : '')).' ORDER BY id DESC LIMIT 0,1';
 			$result = db_query_array($sql);
 			
 			if ($result) {
@@ -361,9 +365,12 @@ class Orders {
 			$price_str .= ' END)';
 			$price_str1 .= ' END)';
 			
-			if (count($not_convertible) > 0)
-				$not_in = ' AND (orders.currency = '.$currency_info['id'].' OR orders.currency NOT IN ('.implode(',',$not_convertible).')) ';
-			
+			if ($CFG->cross_currency_trades && count($not_convertible) > 0) {
+				if ($currency_info['not_convertible'] == 'Y')
+					$not_in = ' AND orders.currency = '.$currency_info['id'].' ';
+				else
+					$not_in = ' AND orders.currency NOT IN ('.implode(',',$not_convertible).') ';
+			}
 		}
 		else {
 			$price_str = $price;
@@ -389,7 +396,8 @@ class Orders {
 			return false;
 		
 		$not_convertible = Currencies::getNotConvertible();
-		$sql = 'SELECT orders.order_type, orders.btc_price AS orig_btc_price, orders.btc AS btc_outstanding, orders.currency, orders.currency AS currency_id, orders.market_price AS is_market, orders.id, orders.site_user, orders.stop_price FROM orders WHERE orders.market_price = "Y" AND c_currency = '.$c_currency.' AND orders.currency != '.$c_currency.' '.(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency.' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : '');
+		$currency_info = $CFG->currencies[$currency];
+		$sql = 'SELECT orders.order_type, orders.btc_price AS orig_btc_price, orders.btc AS btc_outstanding, orders.currency, orders.currency AS currency_id, orders.market_price AS is_market, orders.id, orders.site_user, orders.stop_price FROM orders WHERE orders.market_price = "Y" AND c_currency = '.$c_currency.' AND orders.currency != '.$c_currency.' '.((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : ((count($not_convertible) > 0) ? (($currency_info['not_convertible'] == 'Y') ? ' AND orders.currency = '.$currency_info['id'].' ' : ' AND orders.currency NOT IN ('.implode(',',$not_convertible).')') : ''));
 		return db_query_array($sql);
 	}
 
@@ -445,7 +453,7 @@ class Orders {
 				FROM orders
 				".(($market_price && !$get_all_market) ? 'JOIN (SELECT @running_total := 0) r' : '')."
 				WHERE c_currency = ".$c_currency." AND orders.currency != ".$c_currency."
-				".(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency_info['id'].' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : false)."
+				".(($CFG->cross_currency_trades && count($not_convertible) > 0) ? 'AND (orders.currency = '.$currency.' OR orders.currency NOT IN ('.implode(',',$not_convertible).'))' : '')."
 				".((!$get_all_market) ? "AND orders.order_type = $type " : false)."
 				".((!$market_price) ? " AND (orders.btc_price $comparison $price_str1 OR orders.market_price = 'Y') " : false)."
 				".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)."
@@ -601,9 +609,13 @@ class Orders {
 		elseif ($stop_price > 0)
 			$conditions[] = " orders.btc_price <= $stops_str AND orders.btc_price > 0 ";
 		
-		if ($CFG->cross_currency_trades && count($not_convertible) > 0)
-			$sql .= ' AND (orders.currency = '.$currency_info['id'].' OR orders.currency NOT IN ('.implode(',',$not_convertible).')) ';
-			
+		if ($CFG->cross_currency_trades && count($not_convertible) > 0) {
+			if ($currency_info['not_convertible'] == 'Y')
+				$sql .= ' AND orders.currency = '.$currency_info['id'].' ';
+			else
+				$sql .= ' AND orders.currency NOT IN ('.implode(',',$not_convertible).') ';
+		}
+		
 		$sql .= ' AND ('.implode(' OR ',$conditions).") ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)." AND orders.site_user = $user_id ORDER BY ".(($buy && $price > 0) ? 'price' : 'stop_price').' '.$asc;
 		$result = db_query_array($sql);
 
@@ -636,7 +648,7 @@ class Orders {
 			return array('error'=>array('message'=>str_replace('[crypto]',$currency_info['fa_symbol'],str_replace('[min]',$CFG->currencies[$c_currency]['fa_symbol'].' '.number_format($currency_info['min_price']/$CFG->currencies[$c_currency]['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
 		
 		if ($price < $min_market_price)
-			return array('error'=>array('message'=>str_replace('[crypto]',$CFG->currencies[$c_currency]['fa_symbol'],str_replace('[min]',$currency_info['fa_symbol'].number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
+			return array('error'=>array('message'=>str_replace('[crypto]',$CFG->currencies[$c_currency]['fa_symbol'],str_replace('[min]',$currency_info['fa_symbol'].' '.number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
 		
 		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
