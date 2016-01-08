@@ -632,8 +632,11 @@ class Orders {
 		if ($price == $stop_price)
 			$price = 0;
 		
+		if ($price > 0 && ($CFG->currencies[$c_currency]['usd_ask']/$price) < $currency_info['min_price'])
+			return array('error'=>array('message'=>str_replace('[crypto]',$currency_info['fa_symbol'],str_replace('[min]',$CFG->currencies[$c_currency]['fa_symbol'].' '.number_format($currency_info['min_price']/$CFG->currencies[$c_currency]['usd_ask'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
+		
 		if ($price < $min_market_price)
-			return array('error'=>array('message'=>str_replace('[min]',$currency_info['fa_symbol'].number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price')),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
+			return array('error'=>array('message'=>str_replace('[crypto]',$CFG->currencies[$c_currency]['fa_symbol'],str_replace('[min]',$currency_info['fa_symbol'].number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
 		
 		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
