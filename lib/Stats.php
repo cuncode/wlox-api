@@ -122,7 +122,7 @@ class Stats {
 		$stats['btc_1h'] = $result[0]['btc_1h'];
 		$stats['btc_1h_buy'] = $result[0]['btc_1h_b'];
 		$stats['btc_1h_sell'] = $result[0]['btc_1h_s'];
-		
+
 		if ($CFG->memcached) {
 			$key = 'stats_'.$c_currency_info['currency'].'_'.$currency_info['currency'];
 			$set[$key] = $stats;
