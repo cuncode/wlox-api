@@ -371,6 +371,8 @@ class Orders {
 				else
 					$not_in = ' AND orders.currency NOT IN ('.implode(',',$not_convertible).') ';
 			}
+			else
+				$not_in = '';
 		}
 		else {
 			$price_str = $price;
