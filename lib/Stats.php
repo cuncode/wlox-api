@@ -20,7 +20,7 @@ class Stats {
 		if (empty($currency_info) || empty($c_currency_info))
 			return false;
 		
-		if ($timeframe == '1mon')
+		if ($timeframe == '1mon' || !$timeframe)
 			$start = date('Y-m-d',strtotime('-1 month'));
 		elseif ($timeframe == '3mon')
 			$start = date('Y-m-d',strtotime('-3 month'));
