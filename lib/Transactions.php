@@ -254,10 +254,7 @@ class Transactions {
 				return $cached;
 		}
 		
-		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
-		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : $CFG->currencies['USD'];
 		$usd_field = 'usd_ask';
-		
 		$price_str = '(CASE WHEN transactions.currency = '.$currency_info['id'].' THEN transactions.btc_price WHEN transactions.currency1 = '.$currency_info['id'].' THEN transactions.orig_btc_price ELSE transactions.orig_btc_price * (CASE transactions.currency1 ';
 		foreach ($CFG->currencies as $curr_id => $currency1) {
 			if (is_numeric($curr_id) || $currency1['id'] == $c_currency || $currency1['id'] == $currency)

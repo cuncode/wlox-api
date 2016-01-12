@@ -42,7 +42,7 @@ class Stats {
 		if (!$usd_ask)
 			return false;
 		
-		$sql = "SELECT ".((!$public_api) ? "(UNIX_TIMESTAMP(DATE(`date`)) * 1000) AS" : '')." `date`,ROUND((usd/$usd_ask),2) AS price FROM historical_data WHERE `date` >= '$start' GROUP BY `date` ORDER BY `date` ASC";
+		$sql = "SELECT ".((!$public_api) ? "(UNIX_TIMESTAMP(DATE(`date`)) * 1000) AS" : '')." `date`,ROUND((usd/$usd_ask),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price FROM historical_data WHERE `date` >= '$start' AND c_currency = ".$c_currency_info['id']." GROUP BY `date` ORDER BY `date` ASC";
 		$result = db_query_array($sql);
 		if ($CFG->memcached)
 			$CFG->m->set('historical_'.$currency.'_'.$timeframe.(($public_api) ? '_api' : ''),$result,3600);
