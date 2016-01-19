@@ -359,8 +359,8 @@ class Orders {
 				$c_max = (!empty($currency_max) && !empty($currency_max[$currency1['id']])) ? $currency_max[$currency1['id']] : 0; 
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
 				
-				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($c_min < round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) ? $c_min : round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP)).' ';
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.($c_max > round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) ? $c_max : round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP)).' ';
+				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($c_min < number_format(round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','') ? $c_min : number_format(round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','')).' ';
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.($c_max > number_format(round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','') ? $c_max : number_format(round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','')).' ';
 			}
 			$price_str .= ' END)';
 			$price_str1 .= ' END)';
@@ -433,7 +433,7 @@ class Orders {
 				$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
 				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($conversion + (($conversion * $CFG->currency_conversion_fee) * ($type == $CFG->order_type_ask ? 1 : -1))).' ';
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.round((($price * $conversion1) + ($compare_with_conv_fees ? (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1)) : 0)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round((($price * $conversion1) + ($compare_with_conv_fees ? (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1)) : 0)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
 			}
 			$price_str .= ' END))';
 			$price_str1 .= ' END)';
@@ -476,7 +476,7 @@ class Orders {
 				
 				if ($row['is_market'] == 'Y') {
 					$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $CFG->currencies[$row['currency_id']][$usd_field] : $currency_info[$usd_field] / $CFG->currencies[$row['currency_id']][$usd_field];
-					$result[$key]['orig_btc_price'] = ($row['currency_id'] == $currency_info['id'] || !$CFG->cross_currency_trades) ? $price : round((($price * $conversion1) + (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1))),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+					$result[$key]['orig_btc_price'] = ($row['currency_id'] == $currency_info['id'] || !$CFG->cross_currency_trades) ? $price : number_format(round((($price * $conversion1) + (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1))),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),'.','');
 				}
 				else {
 					$result[$key]['orig_btc_price'] = $row['btc_price'];
@@ -579,10 +579,10 @@ class Orders {
 		
 				$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
-				$price_str .= ' WHEN '.$currency1['id'].' THEN '.round($price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
-				$stops_str .= ' WHEN '.$currency1['id'].' THEN '.round($stop_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
-				$stops_str1 .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
+				$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
+				$stops_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($stop_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
+				$stops_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			}
 			$price_str .= ' END)';
 			$price_str1 .= ' END)';
@@ -619,8 +619,8 @@ class Orders {
 		}
 		
 		$sql .= ' AND ('.implode(' OR ',$conditions).") ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)." AND orders.site_user = $user_id ORDER BY ".(($buy && $price > 0) ? 'price' : 'stop_price').' '.$asc;
+		error_log(print_r(array($sql),1),3,ini_get('error_log'));
 		$result = db_query_array($sql);
-
 		if ($result) {
 			if ($result[0]['price'] > 0 && (!$stop_price || $result[0]['price'] > $stop_price) && !($buy && $result[0]['price'] > $price))
 				return array('error'=>array('message'=>Lang::string('buy-errors-outbid-self').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_OUTBID_SELF'));
