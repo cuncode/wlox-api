@@ -188,6 +188,7 @@ class User {
 		'deactivated',
 		'locked',
 		'default_currency',
+		'default_c_currency',
 		'chat_handle',
 		'shares_enabled'
 		);
@@ -692,6 +693,7 @@ class User {
 		//$update['country'] = preg_replace("/[^0-9]/", "",$info['country']);
 		$update['email'] = preg_replace("/[^0-9a-zA-Z@\.\!#\$%\&\*+_\~\?\-]/", "",$info['email']);
 		$update['default_currency'] = preg_replace("/[^0-9]/", "",$info['default_currency']);
+		$update['default_c_currency'] = preg_replace("/[^0-9]/", "",$info['default_c_currency']);
 		$update['chat_handle'] = preg_replace("/[^\pL a-zA-Z0-9@\s\._-]/u", "",$info['chat_handle']);
 		
 		if (!$update['pass'])
