@@ -76,8 +76,8 @@ class Orders {
 				continue;
 	
 			$conversion = (empty($currency_info) || $currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
-			$price_str .= ' WHEN '.$currency1['id'].' THEN '.($conversion + ($conversion * $CFG->currency_conversion_fee * ($show_bids ? -1 : 1))).' ';
-			$price_str_usd .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
+			$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion + ($conversion * $CFG->currency_conversion_fee * ($show_bids ? -1 : 1)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
+			$price_str_usd .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			$currency_abbr .= ' WHEN '.$currency1['id'].' THEN "'.$currency1['currency'].'" ';
 		}
 		$price_str .= ' END)';
@@ -347,6 +347,8 @@ class Orders {
 		$usd_field = 'usd_ask';
 		$currency_info = $CFG->currencies[$currency];
 		$not_convertible = Currencies::getNotConvertible();
+		$min_price = number_format($min_price,8,'.','');
+		$max_price = number_format($max_price,8,'.','');
 		
 		if ($CFG->cross_currency_trades) {
 			$price_str = '(CASE orders.currency WHEN '.$currency_info['id'].' THEN '.$min_price;
@@ -422,6 +424,8 @@ class Orders {
 		$usd_info = $CFG->currencies['USD'];
 		$asc = ($type == $CFG->order_type_ask);
 		$order_asc = ($asc) ? 'ASC' : 'DESC';
+		$price = number_format($price,8,'.','');
+		$amount = number_format($amount,8,'.','');
 		
 		if ($CFG->cross_currency_trades) {
 			$price_str = 'IF(orders.market_price = "Y",'.$price.',(orders.btc_price * CASE orders.currency WHEN '.$currency_info['id'].' THEN 1';
@@ -619,7 +623,6 @@ class Orders {
 		}
 		
 		$sql .= ' AND ('.implode(' OR ',$conditions).") ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)." AND orders.site_user = $user_id ORDER BY ".(($buy && $price > 0) ? 'price' : 'stop_price').' '.$asc;
-		error_log(print_r(array($sql),1),3,ini_get('error_log'));
 		$result = db_query_array($sql);
 		if ($result) {
 			if ($result[0]['price'] > 0 && (!$stop_price || $result[0]['price'] > $stop_price) && !($buy && $result[0]['price'] > $price))
@@ -795,7 +798,7 @@ class Orders {
 		}
 		
 		if (!$market_price) {
-			$error = self::checkUserOrders($buy,$c_currency1,$currency_info,$this_user_id,$price,$stop_price,$fee);
+			$error = self::checkUserOrders($buy,$c_currency1,$currency_info,$this_user_id,number_format($price,8,'.',''),number_format($stop_price,8,'.',''),$fee);
 			if ($error) {
 				db_commit();
 				return $error;
