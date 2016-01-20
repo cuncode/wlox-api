@@ -22,7 +22,7 @@ class User {
 		if (!($session_id > 0) || !$CFG->session_active)
 			return false;
 	
-		$result = db_query_array('SELECT site_users.user,site_users.first_name,site_users.last_name,site_users.country,site_users.email, site_users.default_currency, site_users.chat_handle FROM sessions LEFT JOIN site_users ON (sessions.user_id = site_users.id) WHERE sessions.session_id = '.$session_id);
+		$result = db_query_array('SELECT site_users.user,site_users.first_name,site_users.last_name,site_users.country,site_users.email, site_users.default_currency, site_users.default_c_currency, site_users.chat_handle FROM sessions LEFT JOIN site_users ON (sessions.user_id = site_users.id) WHERE sessions.session_id = '.$session_id);
 		return $result[0];
 	}
 	
@@ -297,9 +297,6 @@ class User {
 						continue;
 					if (!($value > 0) && !($currencies && in_array($CFG->currencies[$field]['id'],$currencies)))
 						continue;
-					
-					if ($field != 'BTC')
-						$value = round($value,2,PHP_ROUND_HALF_UP);
 					
 					if ($row['type'] == 'r') {
 						$on_hold[$field]['withdrawal'] = round($value,($CFG->currencies[$field]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
