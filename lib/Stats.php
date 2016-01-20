@@ -106,8 +106,8 @@ class Stats {
 		$stats['last_price'] = ($result[0]['btc_price2']) ? $result[0]['btc_price2'] : $ask;
 		$stats['last_transaction_type'] = $result[0]['last_transaction_type2'];
 		$stats['last_transaction_currency'] = $result[0]['last_transaction_currency2'];
-		$stats['daily_change'] = ($result[0]['btc_price3'] > 0 && $result[0]['btc_price2'] > 0) ? $result[0]['btc_price2'] - $result[0]['btc_price3'] : '0';
-		$stats['daily_change_percent'] = ($stats['last_price'] > 0) ? round(($stats['daily_change']/$stats['last_price']) * 100,2) : 0;
+		$stats['daily_change'] = ($result[0]['btc_price3'] > 0 && $result[0]['btc_price2'] > 0) ? number_format(round($result[0]['btc_price2'] - $result[0]['btc_price3'],8,PHP_ROUND_HALF_UP),8,'.','') : '0';
+		$stats['daily_change_percent'] = ($stats['last_price'] > 0) ? round(($stats['daily_change']/$stats['last_price']) * 100,2,PHP_ROUND_HALF_UP) : 0;
 		$stats['max'] = ($result[0]['max'] > 0) ? $result[0]['max'] : $result[0]['btc_price2'];
 		$stats['min'] = ($result[0]['min'] > 0) ? $result[0]['min'] : $result[0]['btc_price2'];
 		$stats['open'] = ($result[0]['btc_price3'] > 0) ? $result[0]['btc_price3'] : $result[0]['btc_price2'];
