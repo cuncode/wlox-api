@@ -91,7 +91,7 @@ class Orders {
 		if (!$count && !$public_api_open_orders && !$public_api_order_book)
 			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,'.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto,' : ''))." ".(($open_orders) ? 'ROUND('.$price_str_usd.',2) AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
 		elseif (!$count && $public_api_order_book)
-			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, orders.btc AS order_amount, ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp`, $currency_abbr1 AS market ";
+			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, orders.btc AS order_amount, ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp` ";
 		elseif (!$count && $public_api_open_orders)
 			$sql = "SELECT order_log.id AS id, IF(order_log.order_type = {$CFG->order_type_bid},'buy','sell') AS side, (IF(order_log.market_price = 'Y','market',IF(order_log.stop_price > 0,'stop','limit'))) AS `type`, order_log.btc AS amount, IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining) AS amount_remaining, order_log.btc_price AS price, ROUND(SUM(IF(transactions.id IS NOT NULL OR transactions1.id IS NOT NULL,(transactions.btc  / (order_log.btc - IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining))) * IF(transactions.id IS NOT NULL,transactions.btc_price,transactions1.orig_btc_price),0)),".(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),8,2)' : '2').") AS avg_price_executed, order_log.stop_price AS stop_price, $currency_abbr AS currency, $currency_abbr1 AS market, order_log.status AS status, order_log.p_id AS replaced, IF(order_log.status = 'REPLACED',replacing_order.id,0) AS replaced_by, UNIX_TIMESTAMP(orders.date) AS `timestamp`";
 		else
@@ -137,7 +137,7 @@ class Orders {
 			$sql .= " AND orders.currency = {$currency_info['id']} ";
 		
 		if ($c_currency > 0)
-			$sql .= ' AND c_currency = '.$c_currency_info['id'].' AND orders.currency != '.$c_currency_info['id'].' ';
+			$sql .= ' AND orders.c_currency = '.$c_currency_info['id'].' AND orders.currency != '.$c_currency_info['id'].' ';
 		
 		if (!$user && !$public_api_order_book)
 			$sql .= ' GROUP BY orders.btc_price,orders.currency ';
@@ -790,7 +790,6 @@ class Orders {
 		else 
 			$this_fiat_on_hold = 0;
 			
-		
 		$error = self::checkPreconditions($buy,$c_currency1,$currency_info,$amount,$price,$stop_price,$fee,($buy ? $this_fiat_balance - $this_fiat_on_hold : $this_btc_balance - $this_btc_on_hold),$bid,$ask,$market_price,$this_user_id,$orig_order);
 		if ($error) {
 			db_commit();
@@ -1252,7 +1251,7 @@ class Orders {
 				}
 			}
 
-			$order_info = array('id'=>$order_log_id,'side'=>($buy ? 'buy' : 'sell'),'type'=>(($market_price) ? 'market' : (($stop_price > 0) ? 'stop' : 'limit')),'amount'=>$orig_amount,'amount_remaining'=>$amount,'price'=>round($price,8,PHP_ROUND_HALF_UP),'avg_price_executed'=>((count($executed_prices) > 0) ? round(array_sum($avg_exec),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) : 0),'stop_price'=>$stop_price,'market'=>$c_currency_info['currency'],'currency'=>$currency_info['currency'],'status'=>$order_status,'replaced'=>($edit_id ? $orig_order['log_id'] : 0),'comp_orig_prices'=>$executed_orig_prices);
+			$order_info = array('id'=>$order_log_id,'side'=>($buy ? 'buy' : 'sell'),'type'=>(($market_price) ? 'market' : (($stop_price > 0) ? 'stop' : 'limit')),'amount'=>$orig_amount,'amount_remaining'=>number_format(round($amount,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'price'=>number_format(round($price,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'avg_price_executed'=>((count($executed_prices) > 0) ? number_format(round(array_sum($avg_exec),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','') : 0),'stop_price'=>number_format($stop_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'market'=>$c_currency_info['currency'],'currency'=>$currency_info['currency'],'status'=>$order_status,'replaced'=>($edit_id ? $orig_order['log_id'] : 0),'comp_orig_prices'=>$executed_orig_prices);
 		}
 		
 		if ($CFG->memcached) {
@@ -1371,7 +1370,7 @@ class Orders {
 			$sql .= " AND order_log.id = $order_log_id ";
 		
 		if ($user_id > 0)
-			$sql .= " AND orders.site_user = $user_id ";
+			$sql .= " AND order_log.site_user = $user_id ";
 		else
 			$sql .= " AND order_log.site_user = ".User::$info['id'].' ';
 		

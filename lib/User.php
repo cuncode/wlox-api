@@ -309,6 +309,17 @@ class User {
 				}
 			}
 		}
+		if ($on_hold) {
+			foreach ($on_hold as $currency => $row) {
+				if (!$row['total'])
+					unset($on_hold[$currency]);
+				else {
+					$on_hold[$currency]['withdrawal'] = number_format($row['withdrawal'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
+					$on_hold[$currency]['order'] = number_format($row['order'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
+					$on_hold[$currency]['total'] = number_format($row['total'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
+				}
+			}
+		}
 		
 		ksort($on_hold);
 		

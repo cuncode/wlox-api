@@ -103,7 +103,7 @@ if ($api_key1 && $api_signature1) {
 			unset($decoded['signature']);
 		}
 		
-		$hash = hash_hmac('sha256',json_encode($decoded,JSON_NUMERIC_CHECK),$result[0]['secret']);
+		$hash = hash_hmac('sha256',base64_encode(json_encode($decoded,JSON_NUMERIC_CHECK)),$result[0]['secret']);
 		if ($api_signature1 == $hash) {
 			User::setInfo($result[0]);
 			

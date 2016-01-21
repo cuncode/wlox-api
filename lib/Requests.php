@@ -8,8 +8,8 @@ class Requests{
 		
 		$page = preg_replace("/[^0-9]/", "",$page);
 		$per_page = preg_replace("/[^0-9]/", "",$per_page);
-		$currency = preg_replace("/[^a-zA-Z]/", "",$currency);
-		$currency_info = (!empty($CFG->currencies[strtoupper($currency)])) ? $CFG->currencies[strtoupper($currency)] : false;
+		$currency = preg_replace("/[^0-9]/", "",$currency);
+		$currency_info = (!empty($CFG->currencies[$currency])) ? $CFG->currencies[$currency] : false;
 		$type = ($withdrawals) ? $CFG->request_withdrawal_id : $CFG->request_deposit_id;
 		$id = preg_replace("/[^0-9]/", "",$id);
 		
