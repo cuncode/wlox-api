@@ -56,10 +56,22 @@ class Stats {
 		if (strtolower($c_currency_id) == 'all') {
 			$all = array();
 			foreach ($CFG->currencies as $key => $currency1) {
-				if ($currency1['is_crypto'] == 'Y' && !is_numeric($key)) {
+				if ($currency1['is_crypto'] != 'Y' || is_numeric($key))
+					continue;
+				
+				if (strtolower($currency_id) == 'all') {
+					foreach ($CFG->currencies as $key => $currency2) {
+						if ($currency1['id'] == $currency2['id'] || is_numeric($key))
+							continue;
+						
+						$all[$currency1['currency'].'-'.$currency2['currency']] = self::getCurrent($currency1['id'],$currency2['id']);
+					}
+				}
+				else {
 					$all[$currency1['currency']] = self::getCurrent($currency1['id'],$currency_id);
 				}
 			}
+			
 			$all['all'] = true;
 			return $all;
 		}
