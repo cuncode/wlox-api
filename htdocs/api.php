@@ -79,7 +79,7 @@ if ($api_key1 && $api_signature1) {
 	$nonce_invalid = false;
 	if ($CFG->memcached) {
 		$cached = $CFG->m->get('api_'.$api_key1);
-		if ($cached && floatval(substr(strval($nonce1),0,10)) <= (floatval(substr(strval($cached['nonce']),0,10)) - 5)) {
+		if ($cached && floatval(strval($nonce1)) <= (floatval(strval($cached['nonce'])) - 5)) {
 			$nonce_invalid = true;
 		}
 	}
