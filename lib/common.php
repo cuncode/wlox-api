@@ -4,6 +4,7 @@ include '../cfg/cfg.php';
 include '../lib/dblib.php';
 include '../lib/stdlib.php';
 include '../lib/autoload.php';
+include '../vendor/autoload.php';
 
 /* Connect to DB */
 db_connect($CFG->dbhost,$CFG->dbname,$CFG->dbuser,$CFG->dbpass);

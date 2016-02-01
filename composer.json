@@ -1,0 +1,12 @@
+{
+	"minimum-stability": "dev",
+	"prefer-stable": true,
+	"require": {
+		"omnipay/omnipay": "2.3.2",
+		"dercoder/omnipay-ecopayz": "~1.0",
+		"dercoder/omnipay-paysafecard": "dev-master",
+		"dercoder/omnipay-webmoney": "dev-master",
+		"alfaproject/omnipay-skrill": "dev-master",
+		"hiqdev/omnipay-okpay": "dev-master"
+	}
+}
