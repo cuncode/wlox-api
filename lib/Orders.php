@@ -76,8 +76,8 @@ class Orders {
 				continue;
 	
 			$conversion = (empty($currency_info) || $currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
-			$price_str .= ' WHEN '.$currency1['id'].' THEN '.($conversion + ($conversion * $CFG->currency_conversion_fee * ($show_bids ? -1 : 1))).' ';
-			$price_str_usd .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
+			$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion + ($conversion * $CFG->currency_conversion_fee * ($show_bids ? -1 : 1)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
+			$price_str_usd .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			$currency_abbr .= ' WHEN '.$currency1['id'].' THEN "'.$currency1['currency'].'" ';
 		}
 		$price_str .= ' END)';
@@ -91,7 +91,7 @@ class Orders {
 		if (!$count && !$public_api_open_orders && !$public_api_order_book)
 			$sql = "SELECT orders.id, orders.currency, orders.c_currency, orders.market_price, orders.stop_price, orders.log_id, orders.fiat, UNIX_TIMESTAMP(orders.date) AS `date`, ".(!$open_orders ? 'SUM(orders.btc) AS btc,' : 'orders.btc,'.(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),"Y","N") AS is_crypto,' : ''))." ".(($open_orders) ? 'ROUND('.$price_str_usd.',2) AS usd_price, orders.btc_price, ' : 'ROUND('.$price_str.','.($currency_info['is_crypto'] == 'Y' ? 8 : 2).') AS btc_price,')." order_types.name_{$CFG->language} AS type, orders.btc_price AS fiat_price, (UNIX_TIMESTAMP(orders.date) * 1000) AS time_since, site_users.user AS user_id ".($order_by == 'usd_amount' ? ', (orders.btc * '.$price_str_usd.') AS usd_amount' : '') ;
 		elseif (!$count && $public_api_order_book)
-			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, orders.btc AS order_amount, ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp`, $currency_abbr1 AS market ";
+			$sql = "SELECT ROUND($price_str,".($currency_info['is_crypto'] == 'Y' ? 8 : 2).") AS price, SUM(orders.btc) AS order_amount, SUM(ROUND((orders.btc * $price_str),".($currency_info['is_crypto'] == 'Y' ? 8 : 2).")) AS order_value, $currency_abbr AS converted_from, UNIX_TIMESTAMP(orders.date) AS `timestamp` ";
 		elseif (!$count && $public_api_open_orders)
 			$sql = "SELECT order_log.id AS id, IF(order_log.order_type = {$CFG->order_type_bid},'buy','sell') AS side, (IF(order_log.market_price = 'Y','market',IF(order_log.stop_price > 0,'stop','limit'))) AS `type`, order_log.btc AS amount, IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining) AS amount_remaining, order_log.btc_price AS price, ROUND(SUM(IF(transactions.id IS NOT NULL OR transactions1.id IS NOT NULL,(transactions.btc  / (order_log.btc - IF(order_log.status = 'ACTIVE',orders.btc,order_log.btc_remaining))) * IF(transactions.id IS NOT NULL,transactions.btc_price,transactions1.orig_btc_price),0)),".(count($cryptos) > 0 ? 'IF(orders.currency IN ('.implode(',',$cryptos).'),8,2)' : '2').") AS avg_price_executed, order_log.stop_price AS stop_price, $currency_abbr AS currency, $currency_abbr1 AS market, order_log.status AS status, order_log.p_id AS replaced, IF(order_log.status = 'REPLACED',replacing_order.id,0) AS replaced_by, UNIX_TIMESTAMP(orders.date) AS `timestamp`";
 		else
@@ -137,7 +137,7 @@ class Orders {
 			$sql .= " AND orders.currency = {$currency_info['id']} ";
 		
 		if ($c_currency > 0)
-			$sql .= ' AND c_currency = '.$c_currency_info['id'].' AND orders.currency != '.$c_currency_info['id'].' ';
+			$sql .= ' AND orders.c_currency = '.$c_currency_info['id'].' AND orders.currency != '.$c_currency_info['id'].' ';
 		
 		if (!$user && !$public_api_order_book)
 			$sql .= ' GROUP BY orders.btc_price,orders.currency ';
@@ -347,6 +347,8 @@ class Orders {
 		$usd_field = 'usd_ask';
 		$currency_info = $CFG->currencies[$currency];
 		$not_convertible = Currencies::getNotConvertible();
+		$min_price = number_format($min_price,8,'.','');
+		$max_price = number_format($max_price,8,'.','');
 		
 		if ($CFG->cross_currency_trades) {
 			$price_str = '(CASE orders.currency WHEN '.$currency_info['id'].' THEN '.$min_price;
@@ -359,8 +361,8 @@ class Orders {
 				$c_max = (!empty($currency_max) && !empty($currency_max[$currency1['id']])) ? $currency_max[$currency1['id']] : 0; 
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
 				
-				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($c_min < round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) ? $c_min : round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP)).' ';
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.($c_max > round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) ? $c_max : round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP)).' ';
+				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($c_min < number_format(round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','') ? $c_min : number_format(round($min_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','')).' ';
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.($c_max > number_format(round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','') ? $c_max : number_format(round($max_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','')).' ';
 			}
 			$price_str .= ' END)';
 			$price_str1 .= ' END)';
@@ -422,6 +424,8 @@ class Orders {
 		$usd_info = $CFG->currencies['USD'];
 		$asc = ($type == $CFG->order_type_ask);
 		$order_asc = ($asc) ? 'ASC' : 'DESC';
+		$price = number_format($price,8,'.','');
+		$amount = number_format($amount,8,'.','');
 		
 		if ($CFG->cross_currency_trades) {
 			$price_str = 'IF(orders.market_price = "Y",'.$price.',(orders.btc_price * CASE orders.currency WHEN '.$currency_info['id'].' THEN 1';
@@ -433,7 +437,7 @@ class Orders {
 				$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
 				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($conversion + (($conversion * $CFG->currency_conversion_fee) * ($type == $CFG->order_type_ask ? 1 : -1))).' ';
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.round((($price * $conversion1) + ($compare_with_conv_fees ? (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1)) : 0)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round((($price * $conversion1) + ($compare_with_conv_fees ? (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1)) : 0)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
 			}
 			$price_str .= ' END))';
 			$price_str1 .= ' END)';
@@ -476,7 +480,7 @@ class Orders {
 				
 				if ($row['is_market'] == 'Y') {
 					$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $CFG->currencies[$row['currency_id']][$usd_field] : $currency_info[$usd_field] / $CFG->currencies[$row['currency_id']][$usd_field];
-					$result[$key]['orig_btc_price'] = ($row['currency_id'] == $currency_info['id'] || !$CFG->cross_currency_trades) ? $price : round((($price * $conversion1) + (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1))),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+					$result[$key]['orig_btc_price'] = ($row['currency_id'] == $currency_info['id'] || !$CFG->cross_currency_trades) ? $price : number_format(round((($price * $conversion1) + (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1))),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($CFG->currencies[$row['currency_id']]['is_crypto'] == 'Y' ? 8 : 2),'.','');
 				}
 				else {
 					$result[$key]['orig_btc_price'] = $row['btc_price'];
@@ -579,10 +583,10 @@ class Orders {
 		
 				$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
-				$price_str .= ' WHEN '.$currency1['id'].' THEN '.round($price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
-				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
-				$stops_str .= ' WHEN '.$currency1['id'].' THEN '.round($stop_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
-				$stops_str1 .= ' WHEN '.$currency1['id'].' THEN '.$conversion.' ';
+				$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
+				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
+				$stops_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($stop_price * $conversion1,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
+				$stops_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			}
 			$price_str .= ' END)';
 			$price_str1 .= ' END)';
@@ -620,7 +624,6 @@ class Orders {
 		
 		$sql .= ' AND ('.implode(' OR ',$conditions).") ".((!$CFG->cross_currency_trades) ? "AND orders.currency = {$currency_info['id']}" : false)." AND orders.site_user = $user_id ORDER BY ".(($buy && $price > 0) ? 'price' : 'stop_price').' '.$asc;
 		$result = db_query_array($sql);
-
 		if ($result) {
 			if ($result[0]['price'] > 0 && (!$stop_price || $result[0]['price'] > $stop_price) && !($buy && $result[0]['price'] > $price))
 				return array('error'=>array('message'=>Lang::string('buy-errors-outbid-self').(($currency_info['id'] != $result[0]['currency']) ? str_replace('[price]',$currency_info['fa_symbol'].number_format($result[0]['price'],($currency_info['is_crypto'] == 'Y' ? 8 : 2)),' '.Lang::string('limit-max-price')) : ''),'code'=>'ORDER_OUTBID_SELF'));
@@ -655,8 +658,8 @@ class Orders {
 		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
 		
-		if (($subtotal * $currency_info['usd_ask']) < $CFG->orders_min_usd || $subtotal < 0.00000001 || $price > 9999999999999999 || ($buy ? (($amount * $current_ask) < 0.01 && $current_ask > 0) : (($amount * $current_bid) < 0.01  && $current_bid > 0)))
-			return array('error'=>array('message'=>str_replace('[amount]',number_format(($CFG->orders_min_usd/$currency_info['usd_ask']),2),str_replace('[fa_symbol]',$currency_info['fa_symbol'],Lang::string('buy-errors-too-little'))),'code'=>'ORDER_UNDER_MINIMUM'));
+		if (($subtotal * $currency_info['usd_ask']) < $CFG->orders_min_usd || $subtotal < 0.00000001 || $price > 9999999999999999 || ($buy ? (($amount * $current_ask) < 0.00000001 && $current_ask > 0) : (($amount * $current_bid) < 0.00000001  && $current_bid > 0)))
+			return array('error'=>array('message'=>str_replace('[amount]',number_format(($CFG->orders_min_usd/$currency_info['usd_ask']),($currency_info['is_crypto'] == 'Y' ? 8 : 2)),str_replace('[fa_symbol]',$currency_info['fa_symbol'].' ',Lang::string('buy-errors-too-little'))),'code'=>'ORDER_UNDER_MINIMUM'));
 		
 		if ((($buy && $stop_price > 0 && $stop_price <= $current_ask) || (!$buy && $stop_price >= $current_bid)) && $stop_price > 0)
 			return array('error'=>array('message'=>($buy) ? Lang::string('buy-stop-lower-ask') : Lang::string('sell-stop-higher-bid'),'code'=>'ORDER_STOP_IN_MARKET'));
@@ -787,7 +790,6 @@ class Orders {
 		else 
 			$this_fiat_on_hold = 0;
 			
-		
 		$error = self::checkPreconditions($buy,$c_currency1,$currency_info,$amount,$price,$stop_price,$fee,($buy ? $this_fiat_balance - $this_fiat_on_hold : $this_btc_balance - $this_btc_on_hold),$bid,$ask,$market_price,$this_user_id,$orig_order);
 		if ($error) {
 			db_commit();
@@ -795,7 +797,7 @@ class Orders {
 		}
 		
 		if (!$market_price) {
-			$error = self::checkUserOrders($buy,$c_currency1,$currency_info,$this_user_id,$price,$stop_price,$fee);
+			$error = self::checkUserOrders($buy,$c_currency1,$currency_info,$this_user_id,number_format($price,8,'.',''),number_format($stop_price,8,'.',''),$fee);
 			if ($error) {
 				db_commit();
 				return $error;
@@ -1249,7 +1251,7 @@ class Orders {
 				}
 			}
 
-			$order_info = array('id'=>$order_log_id,'side'=>($buy ? 'buy' : 'sell'),'type'=>(($market_price) ? 'market' : (($stop_price > 0) ? 'stop' : 'limit')),'amount'=>$orig_amount,'amount_remaining'=>$amount,'price'=>round($price,8,PHP_ROUND_HALF_UP),'avg_price_executed'=>((count($executed_prices) > 0) ? round(array_sum($avg_exec),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP) : 0),'stop_price'=>$stop_price,'market'=>$c_currency_info['currency'],'currency'=>$currency_info['currency'],'status'=>$order_status,'replaced'=>($edit_id ? $orig_order['log_id'] : 0),'comp_orig_prices'=>$executed_orig_prices);
+			$order_info = array('id'=>$order_log_id,'side'=>($buy ? 'buy' : 'sell'),'type'=>(($market_price) ? 'market' : (($stop_price > 0) ? 'stop' : 'limit')),'amount'=>$orig_amount,'amount_remaining'=>number_format(round($amount,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'price'=>number_format(round($price,($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'avg_price_executed'=>((count($executed_prices) > 0) ? number_format(round(array_sum($avg_exec),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.','') : 0),'stop_price'=>number_format($stop_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2),'.',''),'market'=>$c_currency_info['currency'],'currency'=>$currency_info['currency'],'status'=>$order_status,'replaced'=>($edit_id ? $orig_order['log_id'] : 0),'comp_orig_prices'=>$executed_orig_prices);
 		}
 		
 		if ($CFG->memcached) {
@@ -1368,7 +1370,7 @@ class Orders {
 			$sql .= " AND order_log.id = $order_log_id ";
 		
 		if ($user_id > 0)
-			$sql .= " AND orders.site_user = $user_id ";
+			$sql .= " AND order_log.site_user = $user_id ";
 		else
 			$sql .= " AND order_log.site_user = ".User::$info['id'].' ';
 		

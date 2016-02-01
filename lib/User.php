@@ -22,7 +22,7 @@ class User {
 		if (!($session_id > 0) || !$CFG->session_active)
 			return false;
 	
-		$result = db_query_array('SELECT site_users.first_name,site_users.last_name,site_users.country,site_users.email, site_users.default_currency, site_users.chat_handle FROM sessions LEFT JOIN site_users ON (sessions.user_id = site_users.id) WHERE sessions.session_id = '.$session_id);
+		$result = db_query_array('SELECT site_users.user,site_users.first_name,site_users.last_name,site_users.country,site_users.email, site_users.default_currency, site_users.default_c_currency, site_users.chat_handle FROM sessions LEFT JOIN site_users ON (sessions.user_id = site_users.id) WHERE sessions.session_id = '.$session_id);
 		return $result[0];
 	}
 	
@@ -188,7 +188,9 @@ class User {
 		'deactivated',
 		'locked',
 		'default_currency',
-		'chat_handle'
+		'default_c_currency',
+		'chat_handle',
+		'shares_enabled'
 		);
 		
 		$return = array();
@@ -296,9 +298,6 @@ class User {
 					if (!($value > 0) && !($currencies && in_array($CFG->currencies[$field]['id'],$currencies)))
 						continue;
 					
-					if ($field != 'BTC')
-						$value = round($value,2,PHP_ROUND_HALF_UP);
-					
 					if ($row['type'] == 'r') {
 						$on_hold[$field]['withdrawal'] = round($value,($CFG->currencies[$field]['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
 					}
@@ -307,6 +306,18 @@ class User {
 					}
 					
 					$on_hold[$field]['total'] = floatval($value) + (!empty($on_hold[$field]['total']) ? $on_hold[$field]['total'] : 0);
+				}
+			}
+		}
+
+		if ($on_hold) {
+			foreach ($on_hold as $currency => $row) {
+				if (!$row['total'])
+					unset($on_hold[$currency]);
+				else {
+					$on_hold[$currency]['withdrawal'] = number_format($row['withdrawal'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
+					$on_hold[$currency]['order'] = number_format($row['order'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
+					$on_hold[$currency]['total'] = number_format($row['total'],($CFG->currencies[$currency]['is_crypto'] == 'Y' ? 8 : 2),'.','');
 				}
 			}
 		}
@@ -691,6 +702,7 @@ class User {
 		//$update['country'] = preg_replace("/[^0-9]/", "",$info['country']);
 		$update['email'] = preg_replace("/[^0-9a-zA-Z@\.\!#\$%\&\*+_\~\?\-]/", "",$info['email']);
 		$update['default_currency'] = preg_replace("/[^0-9]/", "",$info['default_currency']);
+		$update['default_c_currency'] = preg_replace("/[^0-9]/", "",$info['default_c_currency']);
 		$update['chat_handle'] = preg_replace("/[^\pL a-zA-Z0-9@\s\._-]/u", "",$info['chat_handle']);
 		
 		if (!$update['pass'])
