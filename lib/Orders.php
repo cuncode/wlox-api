@@ -74,7 +74,7 @@ class Orders {
 			$currency_abbr1 .= ' WHEN '.$currency1['id'].' THEN "'.$currency1['currency'].'" ';
 			if ($currency1['id'] == $c_currency || $currency1['id'] == $currency)
 				continue;
-	
+			
 			$conversion = (empty($currency_info) || $currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 			$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion + ($conversion * $CFG->currency_conversion_fee * ($show_bids ? -1 : 1)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			$price_str_usd .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion,($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
@@ -283,8 +283,8 @@ class Orders {
 					continue;
 		
 				$conversion = (empty($currency_info) || $currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
-				$price_str_bid .= ' WHEN '.$currency1['id'].' THEN '.($conversion - ((!$absolute) ? $conversion * $CFG->currency_conversion_fee : 0)).' ';
-				$price_str_ask .= ' WHEN '.$currency1['id'].' THEN '.($conversion + ((!$absolute) ? $conversion * $CFG->currency_conversion_fee : 0)).' ';
+				$price_str_bid .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion - ((!$absolute) ? $conversion * $CFG->currency_conversion_fee : 0),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
+				$price_str_ask .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion + ((!$absolute) ? $conversion * $CFG->currency_conversion_fee : 0),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 			}
 			$price_str_bid .= ' END)';
 			$price_str_ask .= ' END)';
@@ -298,10 +298,10 @@ class Orders {
 		$result = db_query_array($sql);
 		$res = ($result[0]) ? $result[0] : array('bid'=>0,'ask'=>0);
 		
-		if ($res['bid'] > 0 && !$res['ask'])
+		if ($res['bid'] != null && !$res['ask'])
 			$res['ask'] = $res['bid'];
 		
-		if ($res['ask'] > 0 && !$res['bid'])
+		if ($res['ask'] != null && !$res['bid'])
 			$res['bid'] = $res['ask'];
 
 		if (!$res['ask'] && !$res['bid']) {
@@ -313,7 +313,7 @@ class Orders {
 					if ($result[0]['currency'] == $currency_info['id'])
 						$result[0]['fiat_price'] = $result[0]['btc_price'];
 					else 
-						$result[0]['fiat_price'] = round($result[0]['orig_btc_price'] * ((empty($currency_info) || $currency_info['currency'] == 'USD') ? $CFG->currencies[$result[0]['currency1']][$usd_field] : $CFG->currencies[$result[0]['currency1']][$usd_field] / $currency_info[$usd_field]),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP);
+						$result[0]['fiat_price'] = number_format(round($result[0]['orig_btc_price'] * ((empty($currency_info) || $currency_info['currency'] == 'USD') ? $CFG->currencies[$result[0]['currency1']][$usd_field] : $CFG->currencies[$result[0]['currency1']][$usd_field] / $currency_info[$usd_field]),($currency_info['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency_info['is_crypto'] == 'Y' ? 8 : 2));
 				}
 			}
 			else {
@@ -328,7 +328,9 @@ class Orders {
 			}
 			
 			if ($result)
-				$res = array('bid'=>$result[0]['fiat_price'],'ask'=>$result[0]['fiat_price']);
+				$res = array('bid'=>($result[0]['fiat_price'] > 0 ? $result[0]['fiat_price'] : 0),'ask'=>($result[0]['fiat_price'] > 0 ? $result[0]['fiat_price'] : 0));
+			else
+				$res = array('bid'=>0,'ask'=>0);
 		}
 		
 		self::$bid_ask[$currency_info['currency']] = $res;
@@ -436,7 +438,7 @@ class Orders {
 		
 				$conversion = ($currency_info['currency'] == 'USD') ? $currency1[$usd_field] : $currency1[$usd_field] / $currency_info[$usd_field];
 				$conversion1 = ($currency_info['currency'] == 'USD') ? 1 / $currency1[$usd_field] : $currency_info[$usd_field] / $currency1[$usd_field];
-				$price_str .= ' WHEN '.$currency1['id'].' THEN '.($conversion + (($conversion * $CFG->currency_conversion_fee) * ($type == $CFG->order_type_ask ? 1 : -1))).' ';
+				$price_str .= ' WHEN '.$currency1['id'].' THEN '.number_format(round($conversion + (($conversion * $CFG->currency_conversion_fee) * ($type == $CFG->order_type_ask ? 1 : -1)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','').' ';
 				$price_str1 .= ' WHEN '.$currency1['id'].' THEN '.number_format(round((($price * $conversion1) + ($compare_with_conv_fees ? (($price * $conversion1) * $CFG->currency_conversion_fee * (($type == $CFG->order_type_ask) ? -1 : 1)) : 0)),($currency1['is_crypto'] == 'Y' ? 8 : 2),PHP_ROUND_HALF_UP),($currency1['is_crypto'] == 'Y' ? 8 : 2),'.','');
 			}
 			$price_str .= ' END))';
@@ -636,7 +638,7 @@ class Orders {
 		return false;
 	}
 	
-	public static function checkPreconditions($buy,$c_currency,$currency_info,$amount,$price,$stop_price,$fee,$user_available,$current_bid,$current_ask,$market_price,$user_id=false,$orig_order=false) {
+	public static function checkPreconditions($buy,$c_currency,$currency_info,$amount,$price,$stop_price,$fee,$user_available,$current_bid,$current_ask,$market_price,$user_id=false,$orig_order=false,$buy_all=false) {
 		global $CFG;
 		
 		$c_currency = preg_replace("/[^0-9]/", "",$c_currency);
@@ -655,7 +657,7 @@ class Orders {
 		if ($price < $min_market_price)
 			return array('error'=>array('message'=>str_replace('[crypto]',$CFG->currencies[$c_currency]['fa_symbol'],str_replace('[min]',$currency_info['fa_symbol'].' '.number_format($min_market_price,($currency_info['is_crypto'] == 'Y' ? 8 : 2)),Lang::string('buy-errors-under-min-price'))),'code'=>'ORDER_PRICE_UNDER_MINIMUM'));
 		
-		if (($buy && $total > $user_available) || (!$buy && $amount > $user_available))
+		if ((($buy && $total > $user_available) || (!$buy && $amount > $user_available)) && !$buy_all)
 			return array('error'=>array('message'=>Lang::string('buy-errors-balance-too-low'),'code'=>'ORDER_BALANCE_TOO_LOW'));
 		
 		if (($subtotal * $currency_info['usd_ask']) < $CFG->orders_min_usd || $subtotal < 0.00000001 || $price > 9999999999999999 || ($buy ? (($amount * $current_ask) < 0.00000001 && $current_ask > 0) : (($amount * $current_bid) < 0.00000001  && $current_bid > 0)))
@@ -680,7 +682,7 @@ class Orders {
 		return false;
 	}
 	
-	public static function executeOrder($buy,$price,$amount,$c_currency1,$currency1,$fee,$market_price,$edit_id=0,$this_user_id=0,$external_transaction=false,$stop_price=false,$use_maker_fee=false,$verbose=false) {
+	public static function executeOrder($buy,$price,$amount,$c_currency1,$currency1,$fee,$market_price,$edit_id=0,$this_user_id=0,$external_transaction=false,$stop_price=false,$use_maker_fee=false,$verbose=false,$buy_all=false) {
 		global $CFG;
 		
 		if (!$CFG->session_active)
@@ -780,6 +782,9 @@ class Orders {
 		$no_compatible = false;
 		$triggered_rows = false;
 		
+		if ($buy_all && $ask > 0)
+			$amount = $this_fiat_balance / $ask;
+		
 		if (!empty($on_hold[$c_currency_info['currency']]['total']))
 			$this_btc_on_hold = ($edit_id > 0 && !$buy) ? max($on_hold[$c_currency_info['currency']]['total'] - $orig_order['btc'],0) : $on_hold[$c_currency_info['currency']]['total'];
 		else
@@ -790,7 +795,7 @@ class Orders {
 		else 
 			$this_fiat_on_hold = 0;
 			
-		$error = self::checkPreconditions($buy,$c_currency1,$currency_info,$amount,$price,$stop_price,$fee,($buy ? $this_fiat_balance - $this_fiat_on_hold : $this_btc_balance - $this_btc_on_hold),$bid,$ask,$market_price,$this_user_id,$orig_order);
+		$error = self::checkPreconditions($buy,$c_currency1,$currency_info,$amount,$price,$stop_price,$fee,($buy ? $this_fiat_balance - $this_fiat_on_hold : $this_btc_balance - $this_btc_on_hold),$bid,$ask,$market_price,$this_user_id,$orig_order,$buy_all);
 		if ($error) {
 			db_commit();
 			return $error;
@@ -981,7 +986,7 @@ class Orders {
 						}
 						$order_status = 'ACTIVE';
 					}
-					else {
+					else if (!$buy_all) {
 						self::cancelOrder($edit_id,$amount,$c_currency1);
 						$order_status = 'OUT_OF_FUNDS';
 					}
@@ -992,7 +997,7 @@ class Orders {
 						$new_order = ($stop_price != $price && $stop_price > 0) ? 2 : 1;
 						$order_status = 'ACTIVE';
 					}
-					else {
+					else if (!$buy_all) {
 						self::cancelOrder(false,$amount,$c_currency1);
 						$order_status = 'OUT_OF_FUNDS';
 					}

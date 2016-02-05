@@ -391,9 +391,10 @@ class User {
 				WHERE (site_user = ".User::$info['id']." OR site_user1 = ".User::$info['id'].")
 				AND transactions.date >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
 				LIMIT 0,1";
+		
 		$result = db_query_array($sql);
 		if ($CFG->memcached)
-			$CFG->m->set('user_volume_'.User::$info['id'],300);
+			$CFG->m->set('user_volume_'.User::$info['id'],$result[0]['volume'],300);
 		
 		return $result[0]['volume'];
 	}

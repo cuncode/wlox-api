@@ -140,6 +140,7 @@ class Stats {
 		$stats['global_btc'] = $result[0]['global_btc'];
 		$stats['market_cap'] = ($result[0]['market_cap'] * $CFG->currencies[$main['fiat']]['usd_ask'])/$currency_info['usd_ask'];
 		$stats['trade_volume'] = number_format(($result[0]['trade_volume'] * $CFG->currencies[$main['fiat']]['usd_ask'])/$currency_info['usd_ask'],2,'.','');
+		$stats['trade_volume'] = ($stats['trade_volume'] < $result[0]['btc_24h']) ? $result[0]['btc_24h'] : $stats['trade_volume'];
 		$stats['btc_24h'] = $result[0]['btc_24h'];
 		$stats['btc_24h_buy'] = $result[0]['btc_24h_b'];
 		$stats['btc_24h_sell'] = $result[0]['btc_24h_s'];
