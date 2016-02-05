@@ -139,14 +139,14 @@ class Stats {
 		$stats['total_btc'] = $result[0]['global_btc'];
 		$stats['global_btc'] = $result[0]['global_btc'];
 		$stats['market_cap'] = ($result[0]['market_cap'] * $CFG->currencies[$main['fiat']]['usd_ask'])/$currency_info['usd_ask'];
-		$stats['trade_volume'] = number_format(($result[0]['trade_volume'] * $CFG->currencies[$main['fiat']]['usd_ask'])/$currency_info['usd_ask'],2,'.','');
-		$stats['trade_volume'] = ($stats['trade_volume'] < $result[0]['btc_24h']) ? $result[0]['btc_24h'] : $stats['trade_volume'];
-		$stats['btc_24h'] = $result[0]['btc_24h'];
-		$stats['btc_24h_buy'] = $result[0]['btc_24h_b'];
-		$stats['btc_24h_sell'] = $result[0]['btc_24h_s'];
-		$stats['btc_1h'] = $result[0]['btc_1h'];
-		$stats['btc_1h_buy'] = $result[0]['btc_1h_b'];
-		$stats['btc_1h_sell'] = $result[0]['btc_1h_s'];
+		$stats['trade_volume'] = number_format(($result[0]['trade_volume'] * $CFG->currencies[$main['fiat']]['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['trade_volume'] = ($stats['trade_volume'] < $result[0]['btc_24h']) ? number_format(($result[0]['btc_24h']  * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','') : $stats['trade_volume'];
+		$stats['btc_24h'] = number_format(($result[0]['btc_24h']  * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['btc_24h_buy'] = number_format(($result[0]['btc_24h_b'] * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['btc_24h_sell'] = number_format(($result[0]['btc_24h_s'] * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['btc_1h'] = number_format(($result[0]['btc_1h'] * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['btc_1h_buy'] = number_format(($result[0]['btc_1h_b'] * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
+		$stats['btc_1h_sell'] = number_format(($result[0]['btc_1h_s'] * $c_currency_info['usd_ask'])/$currency_info['usd_ask'],8,'.','');
 
 		if ($CFG->memcached) {
 			$key = 'stats_'.$c_currency_info['currency'].'_'.$currency_info['currency'];
