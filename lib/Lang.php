@@ -20,6 +20,7 @@ class Lang {
 				$lang_table[$key]['en'] = str_replace('[exchange_name]',$CFG->exchange_name,str_replace('[baseurl]',$CFG->frontend_baseurl,$row['eng']));
 				$lang_table[$key]['ru'] = str_replace('[exchange_name]',$CFG->exchange_name,str_replace('[baseurl]',$CFG->frontend_baseurl,$row['ru']));
 				$lang_table[$key]['zh'] = str_replace('[exchange_name]',$CFG->exchange_name,str_replace('[baseurl]',$CFG->frontend_baseurl,$row['zh']));
+				$lang_table[$key]['pt'] = str_replace('[exchange_name]',$CFG->exchange_name,str_replace('[baseurl]',$CFG->frontend_baseurl,$row['pt']));
 			}
 
 			if ($CFG->memcached)

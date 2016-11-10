@@ -17,7 +17,7 @@ $raw_params_json = (!empty($_POST['raw_params_json'])) ? $_POST['raw_params_json
 $update_nonce = false;
 $awaiting_token = false;
 
-$CFG->language = (!empty($_POST['lang']) && in_array(strtolower($_POST['lang']),array('en','es','ru','zh'))) ? strtolower($_POST['lang']) : false;
+$CFG->language = (!empty($_POST['lang']) && in_array(strtolower($_POST['lang']),array('en','es','ru','zh','pt'))) ? strtolower($_POST['lang']) : false;
 $CFG->client_ip = (!empty($_POST['ip'])) ? preg_replace("/[^0-9\.]/","",$_POST['ip']) : false;
 $CFG->session_id = $session_id1;
 $CFG->session_locked = false;
