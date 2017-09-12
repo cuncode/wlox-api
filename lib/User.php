@@ -166,6 +166,7 @@ class User {
 		
 		$return_values = array(
 		'user',
+		'email',
 		'first_name',
 		'last_name',
 		'fee_schedule',
@@ -581,6 +582,7 @@ class User {
 			db_insert('bitcoin_addresses',array('address'=>$new_address,'site_user'=>$record_id,'date'=>date('Y-m-d H:i:s')));
 		
 			$info['pass'] = $pass1;
+			$info['user'] = $info['email'];
 			$email = SiteEmail::getRecord('register');
 			Email::send($CFG->form_email,$info['email'],$email['title'],$CFG->form_email_from,false,$email['content'],$info);
 		
