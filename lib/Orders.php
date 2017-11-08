@@ -548,8 +548,8 @@ class Orders {
 			'btc_on_hold'=>$btc_on_hold,
 			'btc_balance'=>$btc_balance,
 			'fiat_balance'=>$fiat_balance,
-			'fee'=>$user_fee['fee'],
-			'fee1'=>$user_fee['fee1']);
+			'fee'=>(($user_fee['own_account'] != 'Y') ? $user_fee['fee'] : 0),
+			'fee1'=>(($user_fee['own_account'] != 'Y') ? $user_fee['fee1'] : 0);
 		
 		return $return;
 	}
@@ -759,6 +759,7 @@ class Orders {
 		$stop_price = ($stop_price > 0 && $market_price) ? false : $stop_price;
 		$fee = (!$use_maker_fee) ? $user_fee['fee'] : $user_fee['fee1'];
 		$fee = ($buy && $price < $ask || !$buy && $price > $bid) ? $user_fee['fee1'] : $fee;
+		$fee = (User::$info['own_account'] == 'Y') ? 0 : $fee;
 		$last_price = ($buy) ? $ask : $bid;
 		self::$bid_ask[$c_currency_info['currency']][$currency_info['currency']] = array('bid'=>$bid,'ask'=>$ask);
 		
