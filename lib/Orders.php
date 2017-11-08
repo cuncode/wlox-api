@@ -549,7 +549,8 @@ class Orders {
 			'btc_balance'=>$btc_balance,
 			'fiat_balance'=>$fiat_balance,
 			'fee'=>(($user_fee['own_account'] != 'Y') ? $user_fee['fee'] : 0),
-			'fee1'=>(($user_fee['own_account'] != 'Y') ? $user_fee['fee1'] : 0);
+			'fee1'=>(($user_fee['own_account'] != 'Y') ? $user_fee['fee1'] : 0)
+		);
 		
 		return $return;
 	}
