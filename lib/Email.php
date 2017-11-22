@@ -42,7 +42,7 @@ class Email {
 		$mail = new PHPMailer();
 		$mail->isSMTP();
 		$mail->CharSet = 'UTF-8';
-		$mail->SMTPDebug = 0;
+		$mail->SMTPDebug = 3;
 		$mail->Debugoutput = 'html';
 		$mail->Host = $CFG->email_smtp_host;
 		$mail->Port = $CFG->email_smtp_port;

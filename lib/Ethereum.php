@@ -38,10 +38,11 @@ class Ethereum {
 		curl_setopt($ch,CURLOPT_POST,1);
 		
 		$headers = array();
-		$headers[] = "Content-Type: application/x-www-form-urlencoded";
+		$headers[] = "Content-Type: application/json";
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 		
-		$result = json_decode(curl_exec($ch),true);
+		$data = curl_exec($ch);
+		$result = json_decode($data,true);
 		curl_close($ch);
 		
 		return $result;
