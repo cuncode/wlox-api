@@ -52,7 +52,7 @@ class BitcoinAddresses{
 			return $result[0]['total'];
 	}
 	
-	public static function getNew($c_currency=false,$return_address=false) {
+	public static function getNew($c_currency=false,$return_address=false,$user_id=false) {
 		global $CFG;
 		
 		if (!$CFG->session_active)
@@ -62,13 +62,24 @@ class BitcoinAddresses{
 		if (!array_key_exists($c_currency,$CFG->currencies))
 			return false;
 		
+		$c_currency_info = $CFG->currencies[$c_currency];
 		$wallet = Wallets::getWallet($c_currency);
+		$user_id = (!$user_id) ? User::$info['id'] : $user_id;
 		
-		require_once('../lib/easybitcoin.php');
-		$bitcoin = new Bitcoin($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port'],$wallet['bitcoin_protocol']);
+		if ($c_currency_info['currency'] != 'ETH') {
+			require_once('../lib/easybitcoin.php');
+			$bitcoin = new Bitcoin($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port'],$wallet['bitcoin_protocol']);
+			$new_address = $bitcoin->getnewaddress();
+		}
+		else {
+			$ethereum = new Ethereum($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port']);
+			$new_address = $ethereum->newAccount();
+		}
 		
-		$new_address = $bitcoin->getnewaddress($wallet['bitcoin_accountname']);
-		$new_id = db_insert('bitcoin_addresses',array('c_currency'=>$c_currency,'address'=>$new_address,'site_user'=>User::$info['id'],'date'=>date('Y-m-d H:i:s')));
+		if (!$new_address)
+			return false;
+		
+		$new_id = db_insert('bitcoin_addresses',array('c_currency'=>$c_currency,'address'=>$new_address,'site_user'=>$user_id,'date'=>date('Y-m-d H:i:s')));
 		
 		return ($return_address) ? $new_address : $new_id;
 	}
@@ -79,18 +90,22 @@ class BitcoinAddresses{
 		$btc_address = preg_replace("/[^0-9a-zA-Z]/",'',$btc_address);
 		$c_currency = preg_replace("/[^0-9]/", "",$c_currency);
 		$wallet = Wallets::getWallet($c_currency);
+		$is_valid = false;
 		
 		if (!$btc_address || !$c_currency)
 			return false;
 	
-		require_once('../lib/easybitcoin.php');
-		$bitcoin = new Bitcoin($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port'],$wallet['bitcoin_protocol']);
-		
-		$response = $bitcoin->validateaddress($btc_address);
+		$c_currency_info = $CFG->currencies[$c_currency];
+		if ($c_currency_info['currency'] != 'ETH') {
+			require_once('../lib/easybitcoin.php');
+			$bitcoin = new Bitcoin($wallet['bitcoin_username'],$wallet['bitcoin_passphrase'],$wallet['bitcoin_host'],$wallet['bitcoin_port'],$wallet['bitcoin_protocol']);
+			$response = $bitcoin->validateaddress($btc_address);
+			$is_valid = $response['isvalid']; 
+		}
+		else if ($c_currency_info['coin_type'] == 'ETH') {
+			$is_valid = (strlen($btc_address) == 42);
+		}
 	
-		if (!$response['isvalid'] || !is_array($response))
-			return false;
-		else
-			return true;
+		return $is_valid;
 	}
 }
