@@ -186,6 +186,66 @@ class Requests{
 		else
 			return $request_id;
 	}
+
+	public static function insertGatewayRequest($gateway=false,$currency=false,$amount=false,$link=false) {
+		global $CFG;
+		
+		if (!$CFG->session_active)
+			return false;
+		
+		$g = Gateways::get($gateway_key);
+		if (!$g)
+			return false;
+		
+		$currency = intval($currency);
+		$amount = flotval($amount);
+		$link = filter_var($link,FILTER_VALIDATE_URL);
+		
+		return db_insert('requests',array('date'=>date('Y-m-d H:i:s'),'site_user'=>User::$info['id'],'currency'=>$currency,'amount'=>$amount,'description'=>5,'request_status'=> $CFG->request_pending_id,'request_type'=>$CFG->request_deposit_id,'gateway'=>$g['id'],'link'=>$link));
+	}
+	
+	public static function updateGatewayRequest($request_id,$status='completed',$link=false,$amount=false) {
+		global $CFG;
+		
+		if (!$CFG->session_active)
+			return false;
+		
+		$request_id = intval($request_id);
+		if (!$request_id)
+		
+		$sql = 'SELECT id,amount FROM requests WHERE id = '.$request_id;
+		$result = db_query_array($sql);
+		
+		if ($status == 'completed' && $result) {
+			$status = $CFG->request_completed_id;
+			User::updateBalances($user_info['id'],array($currency=>$user_balances[$currency_info['currency']] - $amount));
+			User::updateBalances(User::$info['id'],array($currency=>$operator_balances[$currency_info['currency']] + $amount - $fee));
+		}
+		else if ($status == 'pending' && $result)
+			$status = $CFG->request_pending_id;
+		else
+			$status = $CFG->request_cancelled_id;
+		
+		$amount = ($amount > 0) ? $result[0]['amount'] : $amount;
+		$link = filter_var($link,FILTER_VALIDATE_URL);
+		
+		return db_update('requests',$request_id,array('request_status'=>$status,'link'=>$link,'amount'=>$amount));
+	}
+	
+	public static function getGatewayActive() {
+		global $CFG;
+		
+		if (!$CFG->session_active)
+			return false;
+		
+		$sql = 'SELECT id, link, g.key FROM requests r LEFT JOIN gateways g ON (r.gateway = g.id) WHERE site_user = '.User::$info['id'].' AND request_status = '.$CFG->request_pending_id.' AND gateway > 0 ORDER BY id DESC';
+		$result = db_query_array($sql);
+		
+		if (!$result)
+			return false;
+		
+		return $result[0];
+	}
 	
 	public static function emailValidate($authcode) {
 		global $CFG;

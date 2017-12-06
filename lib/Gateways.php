@@ -1,20 +1,27 @@
 <?php 
-use Omnipay\Omnipay;
 class Gateways {
 	public static $gateways;
 	
-	public static function get($type=false) {
+	public static function get($key=false,$type=false) {
 		global $CFG;
+		
+		$key = preg_replace("/[^0-9a-zA-Z\.\-\_]/", "",$key);
+		$type = preg_replace("/[^0-9a-zA-Z\.\-\_]/", "",$type);
 		
 		$sql = 'SELECT gateways.*, gateway_types.key AS type_key, gateway_types.name_'.$CFG->language.' AS type_name FROM gateways LEFT JOIN gateway_types ON (gateways.gateway_type = gateway_types.id) WHERE gateways.is_active = "Y" ';
 		if ($type && is_string($type))
 			$sql .= ' AND gateway_types.key = "'.$type.'" ';
 		if ($type && is_numeric($type))
 			$sql .= ' AND gateways.gateway_type = '.$type.' ';
+		if ($key)
+			$sql .= ' AND gateways.key = "'.$key.'" ';
 		
 		$result = db_query_array($sql);
 		$return = array();
 		if ($result) {
+			if ($key)
+				return $result[0];
+			
 			foreach ($result as $row) {
 				$return[$row['id']] = $row;
 			}

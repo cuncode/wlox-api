@@ -73,4 +73,8 @@ if (class_exists('Memcached')) {
 		}
 	}
 }
+
+function debug($something) {
+	error_log(print_r(array($something),1),3,ini_get('error_log'));
+}
 ?>
